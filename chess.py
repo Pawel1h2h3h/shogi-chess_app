@@ -2,6 +2,7 @@
 import pygame
 import sys
 import shogi
+import time
 
 
 # Ustawienia planszy
@@ -22,7 +23,7 @@ BLACK = (0, 0, 0)
 # Ustawienie marginesu
 RECT_POS = CELL_SIZE*9 + 10, 10
 RECT_SIZE = 80, 50
-SAVE_POS = CELL_SIZE*9 +10, CELL_SIZE*9 + 10
+SAVE_POS = CELL_SIZE*9 +10, CELL_SIZE*8 + 10
 SAVE_SIZE = RECT_SIZE
 
 # Utworzenie okna gry
@@ -111,7 +112,7 @@ def draw_save_button():
     # Tekst na przycisku
     font = pygame.font.SysFont('Arial', 20, bold=True)
     message = 'SAVE'
-    text = font.render(message, True, GREY)
+    text = font.render(message, True, BLACK)
     text_rect = text.get_rect(center=(x + width // 2, y + height // 2))
 
     # Rysowanie tekstu
@@ -245,6 +246,74 @@ def redo_last_move(undone_moves, selected_piece, selected_square):
     return selected_piece, selected_square
 
 
+def save_game(board, filename="saved_game.sfen"):
+    """
+    Zapisuje aktualny stan partii do pliku w formacie SFEN.
+
+    :param board: Obiekt planszy shogi.Board
+    :param filename: Nazwa pliku do zapisu
+    """
+    try:
+        with open(filename, "w") as file:
+            # Zapisujemy aktualny stan partii w formacie SFEN
+            file.write(board.sfen())
+        print(f"Partia została zapisana do pliku: {filename}")
+    except IOError as e:
+        print(f"Błąd podczas zapisywania partii: {e}")
+
+def show_save_confirmation(screen):
+    font = pygame.font.SysFont("Arial", 24)
+    message = font.render("Partia zapisana!", True, (0, 255, 0))
+    screen.blit(message, (SCREEN_WIDTH // 2 - message.get_width() // 2, SCREEN_HEIGHT - 50))
+    pygame.display.flip()
+    pygame.time.wait(2000)  # Wyświetl przez 2 sekundy
+
+
+def load_game_from_sfen(filename):
+    """
+    Wczytuje partię z pliku SFEN i ustawia stan planszy.
+
+    :param filename: Nazwa pliku z zapisem w formacie SFEN
+    :return: Obiekt shogi.Board z ustawionym stanem
+    """
+    try:
+        with open(filename, "r") as file:
+            sfen_data = file.read().strip()
+            board = shogi.Board(sfen=sfen_data)
+            print(f"Partia wczytana z pliku: {filename}")
+            return board
+    except FileNotFoundError:
+        print(f"Błąd: Plik {filename} nie został znaleziony.")
+        return None
+
+# Pozycja i rozmiar przycisku "LOAD"
+LOAD_POS = SAVE_POS[0], SAVE_POS[1] - SAVE_SIZE[1] - 10
+
+def draw_load_button():
+    x, y = LOAD_POS
+    width, height = SAVE_SIZE
+
+    # Rysowanie prostokąta przycisku
+    pygame.draw.rect(screen, GREY, (x, y, width, height))
+    pygame.draw.rect(screen, BLACK, (x, y, width, height), 2)  # Kontur przycisku
+
+    # Tekst na przycisku
+    font = pygame.font.SysFont('Arial', 20, bold=True)
+    message = 'LOAD'
+    text = font.render(message, True, BLACK)
+    text_rect = text.get_rect(center=(x + width // 2, y + height // 2))
+
+    # Rysowanie tekstu
+    screen.blit(text, text_rect)
+
+def show_load_confirmation(screen):
+    font = pygame.font.SysFont("Arial", 24)
+    message = font.render("Partia wczytana!", True, (0, 255, 0))
+    screen.blit(message, (SCREEN_WIDTH // 2 - message.get_width() // 2, SCREEN_HEIGHT - 50))
+    pygame.display.flip()
+    pygame.time.wait(2000)  # Wyświetl przez 2 sekundy
+
+
 pygame.init()
 
 undone_moves = []
@@ -255,14 +324,17 @@ highlighted_squares = []
 king_in_check_square = None
 game_over = False
 
+# Inicjalizacja czasu rozpoczęcia gry
+start_time = time.time()
 
+# Pętla gry
 while running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
         elif not game_over and event.type == pygame.MOUSEBUTTONDOWN:
             x, y = pygame.mouse.get_pos()
-            if y < 9*CELL_SIZE and x < 9*CELL_SIZE:
+            if y < 9 * CELL_SIZE and x < 9 * CELL_SIZE:
                 square = (y // CELL_SIZE) * BOARD_SIZE + (x // CELL_SIZE)
 
             # Obsługa przycisku "Cofnij"
@@ -273,6 +345,14 @@ while running:
             elif RECT_POS[0] + RECT_SIZE[0] // 2 <= x <= RECT_POS[0] + RECT_SIZE[0] and RECT_POS[1] <= y <= RECT_POS[1] + RECT_SIZE[1]:
                 selected_piece, selected_square = redo_last_move(undone_moves, selected_piece, selected_square)
 
+            elif SAVE_POS[0] <= x <= SAVE_POS[0] + SAVE_SIZE[0] and SAVE_POS[1] <= y <= SAVE_POS[1] + SAVE_SIZE[1]:
+                save_game(board, "saved_game.sfen")
+                show_save_confirmation(screen)
+            elif LOAD_POS[0] <= x <= LOAD_POS[0] + SAVE_SIZE[0] and LOAD_POS[1] <= y <= LOAD_POS[1] + SAVE_SIZE[1]:
+                new_board = load_game_from_sfen("saved_game.sfen")  # Wczytaj zapis w formacie SFEN
+                if new_board:
+                    board = new_board
+                    show_load_confirmation(screen)
             # Obsługa kliknięcia na planszy
             elif selected_piece is None:
                 # Wybór figury
@@ -293,6 +373,7 @@ while running:
                     board.push(move)
                     undone_moves.clear()  # Gdy wykonano nowy ruch, lista cofniętych ruchów jest czyszczona
 
+
                 # Reset wyboru
                 selected_piece = None
                 selected_square = None
@@ -306,13 +387,22 @@ while running:
                 game_over = True
                 show_game_over_message()
 
+    # Obliczanie upływającego czasu
+    elapsed_time = time.time() - start_time
+    minutes, seconds = divmod(int(elapsed_time), 60)
+
+    # Wyświetlanie czasu gry w tytule okna
+    pygame.display.set_caption(f"Shogi - Czas gry: {minutes:02}:{seconds:02}")
+
     # Rysowanie
     if not game_over:
         screen.fill((0, 0, 0))
         draw_back_button()
         draw_save_button()
+        draw_load_button()  # Nowy przycisk "LOAD"
         draw_board()
         draw_pieces()
         pygame.display.flip()
+
 pygame.quit()
 sys.exit()
