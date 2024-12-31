@@ -5,15 +5,25 @@ import shogi
 
 
 # Ustawienia planszy
-CELL_SIZE = 80
-SCREEN_WIDTH, SCREEN_HEIGHT = 9*CELL_SIZE, 9*CELL_SIZE
+CELL_SIZE = 100
+SCREEN_WIDTH, SCREEN_HEIGHT = 10*CELL_SIZE, 9*CELL_SIZE
 BOARD_SIZE = 9
 
 
-# Kolory
+# Kolory planszy
 LIGHT_COLOR = (240, 217, 181)
 DARK_COLOR = (181, 136, 99)
 LINE_COLOR = (0, 0, 0)
+
+# Kolory marginesu
+GREY = (200, 200, 200)
+BLACK = (0, 0, 0)
+
+# Ustawienie marginesu
+RECT_POS = CELL_SIZE*9 + 10, 10
+RECT_SIZE = 80, 50
+SAVE_POS = CELL_SIZE*9 +10, CELL_SIZE*9 + 10
+SAVE_SIZE = RECT_SIZE
 
 # Utworzenie okna gry
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
@@ -51,7 +61,7 @@ def draw_board():
 
 
 def draw_pieces():
-    font = pygame.font.SysFont("Noto Serif JP", CELL_SIZE // 2, bold=True)
+    font = pygame.font.SysFont("Arial", CELL_SIZE // 2, bold=True)
     for square in range(81):  # Plansza Shogi ma 81 pól (9x9)
         piece = board.piece_at(square)
         if piece:
@@ -63,8 +73,54 @@ def draw_pieces():
             text_rect = text.get_rect(center=(col * CELL_SIZE + CELL_SIZE // 2, row * CELL_SIZE + CELL_SIZE // 2))
             screen.blit(text, text_rect)
 
+def draw_back_button():
+    x, y = RECT_POS
+    width, height = RECT_SIZE
+
+    # Rysowanie prostokąta
+    pygame.draw.rect(screen, GREY, (x, y, width, height))
+
+    # Rysowanie linii podziału
+    pygame.draw.line(screen, BLACK, (x + width // 2, y), (x + width // 2, y + height), 2)
+
+    # Rysowanie trójkąta "cofnij"
+    left_triangle = [
+        (x + 10, y + height // 2),  # Wierzchołek wewnętrzny
+        (x + width // 4, y + 10),  # Wierzchołek górny
+        (x + width // 4, y + height - 10),  # Wierzchołek dolny
+    ]
+    pygame.draw.polygon(screen, BLACK, left_triangle)
+
+    # Rysowanie trójkąta "do przodu"
+    right_triangle = [
+        (x + width - 10, y + height // 2),  # Wierzchołek wewnętrzny
+        (x + 3 * width // 4, y + 10),  # Wierzchołek górny
+        (x + 3 * width // 4, y + height - 10),  # Wierzchołek dolny
+    ]
+    pygame.draw.polygon(screen, BLACK, right_triangle)
+
+
+def draw_save_button():
+    x, y = SAVE_POS
+    width, height = SAVE_SIZE
+
+    # Rysowanie prostokąta przycisku
+    pygame.draw.rect(screen, GREY, (x, y, width, height))
+    pygame.draw.rect(screen, BLACK, (x, y, width, height), 2)  # Kontur przycisku
+
+    # Tekst na przycisku
+    font = pygame.font.SysFont('Arial', 20, bold=True)
+    message = 'SAVE'
+    text = font.render(message, True, GREY)
+    text_rect = text.get_rect(center=(x + width // 2, y + height // 2))
+
+    # Rysowanie tekstu
+    screen.blit(text, text_rect)
+
+
 
 def find_piece(square):
+    """Znajduje figurę o na odpowiednim polu"""
     return board.piece_at(square)
 
 
@@ -147,8 +203,51 @@ def show_game_over_message():
     # Poczekaj kilka sekund
     pygame.time.wait(5000)
 
+def undo_last_move(undone_moves, selected_piece, selected_square):
+    """
+    Cofa ostatni ruch na planszy i zapisuje go do listy cofniętych ruchów.
+
+    :param undone_moves: Lista cofniętych ruchów
+    :param selected_piece: Wybrana figura (resetuje po cofnięciu ruchu)
+    :param selected_square: Wybrane pole (resetuje po cofnięciu ruchu)
+    :return: Zaktualizowane zmienne gry
+    """
+    if board.move_stack:
+        move = board.pop()  # Cofnij ostatni ruch
+        undone_moves.append(move)  # Zapisz cofnięty ruch
+        print("Cofnięto ruch:", move)
+    else:
+        print("Brak ruchów do cofnięcia.")
+
+    selected_piece = None
+    selected_square = None
+    return selected_piece, selected_square
+
+
+def redo_last_move(undone_moves, selected_piece, selected_square):
+    """
+    Przywraca ostatni cofnięty ruch.
+
+    :param undone_moves: Lista cofniętych ruchów
+    :param selected_piece: Wybrana figura (resetuje po przywróceniu ruchu)
+    :param selected_square: Wybrane pole (resetuje po przywróceniu ruchu)
+    :return: Zaktualizowane zmienne gry
+    """
+    if undone_moves:
+        move = undone_moves.pop()  # Pobierz ostatni cofnięty ruch
+        board.push(move)  # Przywróć ruch na planszy
+        print("Przywrócono ruch:", move)
+    else:
+        print("Brak ruchów do przywrócenia.")
+
+    selected_piece = None
+    selected_square = None
+    return selected_piece, selected_square
+
+
 pygame.init()
 
+undone_moves = []
 running = True
 selected_piece = None
 selected_square = None
@@ -156,15 +255,26 @@ highlighted_squares = []
 king_in_check_square = None
 game_over = False
 
+
 while running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
         elif not game_over and event.type == pygame.MOUSEBUTTONDOWN:
-            pos = pygame.mouse.get_pos()
-            square = (pos[1] // CELL_SIZE) * BOARD_SIZE + (pos[0] // CELL_SIZE)
+            x, y = pygame.mouse.get_pos()
+            if y < 9*CELL_SIZE and x < 9*CELL_SIZE:
+                square = (y // CELL_SIZE) * BOARD_SIZE + (x // CELL_SIZE)
 
-            if selected_piece is None:
+            # Obsługa przycisku "Cofnij"
+            if RECT_POS[0] <= x <= RECT_POS[0] + RECT_SIZE[0] // 2 and RECT_POS[1] <= y <= RECT_POS[1] + RECT_SIZE[1]:
+                selected_piece, selected_square = undo_last_move(undone_moves, selected_piece, selected_square)
+
+            # Obsługa przycisku "Do przodu"
+            elif RECT_POS[0] + RECT_SIZE[0] // 2 <= x <= RECT_POS[0] + RECT_SIZE[0] and RECT_POS[1] <= y <= RECT_POS[1] + RECT_SIZE[1]:
+                selected_piece, selected_square = redo_last_move(undone_moves, selected_piece, selected_square)
+
+            # Obsługa kliknięcia na planszy
+            elif selected_piece is None:
                 # Wybór figury
                 piece = find_piece(square)
                 if piece is not None:
@@ -181,6 +291,7 @@ while running:
 
                     move = shogi.Move(from_square=selected_square, to_square=square, promotion=promotion)
                     board.push(move)
+                    undone_moves.clear()  # Gdy wykonano nowy ruch, lista cofniętych ruchów jest czyszczona
 
                 # Reset wyboru
                 selected_piece = None
@@ -198,9 +309,10 @@ while running:
     # Rysowanie
     if not game_over:
         screen.fill((0, 0, 0))
+        draw_back_button()
+        draw_save_button()
         draw_board()
         draw_pieces()
         pygame.display.flip()
-
 pygame.quit()
 sys.exit()
