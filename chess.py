@@ -4,6 +4,10 @@ import sys
 import shogi
 import time
 import json
+import os
+import datetime
+
+
 
 
 # Ustawienia planszy
@@ -26,6 +30,9 @@ RECT_POS = CELL_SIZE*9 + 10, 10
 RECT_SIZE = 80, 50
 SAVE_POS = CELL_SIZE*9 +10, CELL_SIZE*8 + 10
 SAVE_SIZE = RECT_SIZE
+
+# Pozycja i rozmiar przycisku "LOAD"
+LOAD_POS = SAVE_POS[0], SAVE_POS[1] - SAVE_SIZE[1] - 10
 
 # Utworzenie okna gry
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
@@ -61,7 +68,7 @@ def draw_board():
 
 
 
-def draw_pieces():
+def draw_pieces(board):
     font = pygame.font.SysFont("Arial", CELL_SIZE // 2, bold=True)
     for square in range(81):  # Plansza Shogi ma 81 pól (9x9)
         piece = board.piece_at(square)
@@ -288,44 +295,6 @@ def show_save_confirmation(screen):
     pygame.time.wait(2000)  # Wyświetl przez 2 sekundy
 
 
-def load_game(filename='Top10/saved_game.json'):
-    """
-    Wczytuje partię z pliku JSON i ustawia stan planszy.
-
-    :param filename: Nazwa pliku z zapisem w formacie JSON
-    :return: Lista ruchów i czas gry
-    """
-    try:
-        with open(filename, "r") as fp:
-            # Wczytaj dane z pliku JSON
-            data = json.load(fp)
-
-            # Pobierz czas gry
-            game_time = data.get("time", 0)
-
-            # Pobierz listę ruchów
-            moves = []
-            for move_params in data.get("moves", []):
-                move = shogi.Move(
-                    from_square=move_params["from"],
-                    to_square=move_params["to"],
-                    promotion=move_params["promo"]
-                )
-                moves.append(move)
-
-            print(f"Partia wczytana z pliku: {filename}")
-            return moves, game_time
-
-    except FileNotFoundError:
-        print(f"Błąd: Plik {filename} nie został znaleziony.")
-        return None, None
-    except json.JSONDecodeError:
-        print(f"Błąd: Nieprawidłowy format pliku JSON: {filename}")
-        return None, None
-
-# Pozycja i rozmiar przycisku "LOAD"
-LOAD_POS = SAVE_POS[0], SAVE_POS[1] - SAVE_SIZE[1] - 10
-
 def draw_load_button():
     x, y = LOAD_POS
     width, height = SAVE_SIZE
@@ -350,6 +319,42 @@ def show_load_confirmation(screen):
     pygame.display.flip()
     pygame.time.wait(2000)  # Wyświetl przez 2 sekundy
 
+def is_game_long_enugh(new_game_time, folder_path="Top10"):
+    """
+    Sprawdza, czy nowo zapisana gra jest dłuższa od innych zapisanych w folderze.
+
+    :param new_game_time: Czas nowej gry (w sekundach).
+    :param folder_path: Ścieżka do folderu z zapisanymi grami.
+    :return: True, jeśli nowa gra jest najdłuższa, False w przeciwnym razie.
+    """
+    try:
+        # Pobierz wszystkie pliki w folderze
+        all_files = [f for f in os.listdir(folder_path) if f.endswith(".json")]
+
+        # Inicjalizacja zmiennej przechowującej maksymalny czas gry
+        max_time = 0
+
+        # Iteruj po wszystkich plikach w folderze
+        for filename in all_files:
+            file_path = os.path.join(folder_path, filename)
+            with open(file_path, "r") as file:
+                try:
+                    data = json.load(file)
+                    game_time = data.get("time", 0)  # Pobierz czas gry z pliku
+                    min_time = min(max_time, game_time)  # Zaktualizuj maksymalny czas
+                except json.JSONDecodeError:
+                    print(f"Błąd: Nieprawidłowy format pliku {filename}.")
+
+        # Porównaj nową grę z maksymalnym czasem
+        return new_game_time > min_time
+
+    except FileNotFoundError:
+        print(f"Błąd: Folder {folder_path} nie został znaleziony.")
+        return False
+    except Exception as e:
+        print(f"Błąd: {e}")
+        return False
+
 
 undone_moves = []
 running = True
@@ -361,89 +366,88 @@ game_over = False
 start_time = None
 end_time = None  # Czas zakończenia gry, początkowo None
 
-pygame.init()
+if __name__ == "__main__":
+    pygame.init()
+
+    # Pętla gry
+    while running:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+            elif not game_over and event.type == pygame.MOUSEBUTTONDOWN:
+                x, y = pygame.mouse.get_pos()
+                if y < 9 * CELL_SIZE and x < 9 * CELL_SIZE:
+                    square = (y // CELL_SIZE) * BOARD_SIZE + (x // CELL_SIZE)
+
+                # Rozpoczęcie liczenia czasu przy pierwszym ruchu
+                if start_time is None:
+                    start_time = time.time()
+
+                # Obsługa przycisku "Cofnij"
+                if RECT_POS[0] <= x <= RECT_POS[0] + RECT_SIZE[0] // 2 and RECT_POS[1] <= y <= RECT_POS[1] + RECT_SIZE[1]:
+                    selected_piece, selected_square = undo_last_move(undone_moves, selected_piece, selected_square)
+
+                # Obsługa przycisku "Do przodu"
+                elif RECT_POS[0] + RECT_SIZE[0] // 2 <= x <= RECT_POS[0] + RECT_SIZE[0] and RECT_POS[1] <= y <= RECT_POS[1] + RECT_SIZE[1]:
+                    selected_piece, selected_square = redo_last_move(undone_moves, selected_piece, selected_square)
+
+                elif SAVE_POS[0] <= x <= SAVE_POS[0] + SAVE_SIZE[0] and SAVE_POS[1] <= y <= SAVE_POS[1] + SAVE_SIZE[1]:
+                    save_game()
+                    show_save_confirmation(screen)
 
 
-# Pętla gry
-while running:
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            running = False
-        elif not game_over and event.type == pygame.MOUSEBUTTONDOWN:
-            x, y = pygame.mouse.get_pos()
-            if y < 9 * CELL_SIZE and x < 9 * CELL_SIZE:
-                square = (y // CELL_SIZE) * BOARD_SIZE + (x // CELL_SIZE)
+                # Obsługa kliknięcia na planszy
+                elif selected_piece is None:
+                    piece = find_piece(square)
+                    if piece is not None:
+                        selected_piece = piece
+                        selected_square = square
+                        highlighted_squares = get_legal_moves(square)
+                else:
+                    if square in highlighted_squares:
+                        promotion = False
+                        if is_in_promotion_zone(square, selected_piece.color) and not selected_piece.is_promoted():
+                            promotion = ask_for_promotion_gui()
 
-            # Rozpoczęcie liczenia czasu przy pierwszym ruchu
-            if start_time is None:
-                start_time = time.time()
+                        move = shogi.Move(from_square=selected_square, to_square=square, promotion=promotion)
+                        board.push(move)
+                        undone_moves.clear()
 
-            # Obsługa przycisku "Cofnij"
-            if RECT_POS[0] <= x <= RECT_POS[0] + RECT_SIZE[0] // 2 and RECT_POS[1] <= y <= RECT_POS[1] + RECT_SIZE[1]:
-                selected_piece, selected_square = undo_last_move(undone_moves, selected_piece, selected_square)
+                    selected_piece = None
+                    selected_square = None
+                    highlighted_squares = []
 
-            # Obsługa przycisku "Do przodu"
-            elif RECT_POS[0] + RECT_SIZE[0] // 2 <= x <= RECT_POS[0] + RECT_SIZE[0] and RECT_POS[1] <= y <= RECT_POS[1] + RECT_SIZE[1]:
-                selected_piece, selected_square = redo_last_move(undone_moves, selected_piece, selected_square)
+                king_in_check_square = get_king_square_in_check()
 
-            elif SAVE_POS[0] <= x <= SAVE_POS[0] + SAVE_SIZE[0] and SAVE_POS[1] <= y <= SAVE_POS[1] + SAVE_SIZE[1]:
-                save_game()
-                show_save_confirmation(screen)
-            elif LOAD_POS[0] <= x <= LOAD_POS[0] + SAVE_SIZE[0] and LOAD_POS[1] <= y <= LOAD_POS[1] + SAVE_SIZE[1]:
-                x, y = load_game()
-                print(x)
+                if board.is_game_over():
+                    game_over = True
+                    end_time = time.time()  # Zapisz czas zakończenia gry
+                    if is_game_long_enugh(end_time):
+                        save_game(filename=f'Top10/{datetime.date.today()}.json', timex=int(end_time))
+                    show_game_over_message()
 
-
-            # Obsługa kliknięcia na planszy
-            elif selected_piece is None:
-                piece = find_piece(square)
-                if piece is not None:
-                    selected_piece = piece
-                    selected_square = square
-                    highlighted_squares = get_legal_moves(square)
+        # Obliczanie czasu gry
+        if start_time is not None:
+            if end_time is None:
+                elapsed_time = time.time() - start_time  # Gra w toku
             else:
-                if square in highlighted_squares:
-                    promotion = False
-                    if is_in_promotion_zone(square, selected_piece.color) and not selected_piece.is_promoted():
-                        promotion = ask_for_promotion_gui()
-
-                    move = shogi.Move(from_square=selected_square, to_square=square, promotion=promotion)
-                    board.push(move)
-                    undone_moves.clear()
-
-                selected_piece = None
-                selected_square = None
-                highlighted_squares = []
-
-            king_in_check_square = get_king_square_in_check()
-
-            if board.is_game_over():
-                game_over = True
-                end_time = time.time()  # Zapisz czas zakończenia gry
-                show_game_over_message()
-
-    # Obliczanie czasu gry
-    if start_time is not None:
-        if end_time is None:
-            elapsed_time = time.time() - start_time  # Gra w toku
+                elapsed_time = end_time - start_time  # Gra zakończona
         else:
-            elapsed_time = end_time - start_time  # Gra zakończona
-    else:
-        elapsed_time = 0  # Wyświetla 00:00 przed pierwszym ruchem
+            elapsed_time = 0  # Wyświetla 00:00 przed pierwszym ruchem
 
-    minutes, seconds = divmod(int(elapsed_time), 60)
-    pygame.display.set_caption(f'SHOGI-GAME {minutes:02}:{seconds:02}')
+        minutes, seconds = divmod(int(elapsed_time), 60)
+        pygame.display.set_caption(f'SHOGI-GAME {minutes:02}:{seconds:02}')
 
-    # Rysowanie
-    if not game_over:
-        screen.fill((0, 53, 0))
-        draw_back_button()
-        draw_save_button()
-        draw_load_button()
-        draw_board()
-        draw_pieces()
-        pygame.display.flip()
+        # Rysowanie
+        if not game_over:
+            screen.fill((0, 53, 0))
+            draw_back_button()
+            draw_save_button()
+            draw_load_button()
+            draw_board()
+            draw_pieces(board)
+            pygame.display.flip()
 
-pygame.quit()
-sys.exit()
+    pygame.quit()
+    sys.exit()
 
