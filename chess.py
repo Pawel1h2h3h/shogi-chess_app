@@ -11,8 +11,8 @@ import datetime
 
 
 # Ustawienia planszy
-CELL_SIZE = 100
-SCREEN_WIDTH, SCREEN_HEIGHT = 10*CELL_SIZE, 9*CELL_SIZE
+CELL_SIZE = 80
+SCREEN_WIDTH, SCREEN_HEIGHT = 13*CELL_SIZE, 9*CELL_SIZE
 BOARD_SIZE = 9
 
 
@@ -24,15 +24,21 @@ LINE_COLOR = (0, 0, 0)
 # Kolory marginesu
 GREY = (200, 200, 200)
 BLACK = (0, 0, 0)
+WHITE = (255, 255, 255)
 
 # Ustawienie marginesu
 RECT_POS = CELL_SIZE*9 + 10, 10
-RECT_SIZE = 80, 50
+RECT_SIZE = 60, 40
 SAVE_POS = CELL_SIZE*9 +10, CELL_SIZE*8 + 10
 SAVE_SIZE = RECT_SIZE
 
 # Pozycja i rozmiar przycisku "LOAD"
 LOAD_POS = SAVE_POS[0], SAVE_POS[1] - SAVE_SIZE[1] - 10
+
+# MARGINES - wymiary
+MARGINES_X = BOARD_SIZE * CELL_SIZE  # Początek marginesu w osi X
+MARGINES_X1 = MARGINES_X + 14 * CELL_SIZE  # Koniec marginesu w osi X
+ROW_SIZE = 8 * CELL_SIZE / 14  # Wysokość każdego wiersza marginesu
 
 # Utworzenie okna gry
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
@@ -63,7 +69,7 @@ def draw_board():
                 (col * CELL_SIZE, row * CELL_SIZE, CELL_SIZE, CELL_SIZE),
             )
     for i in range(BOARD_SIZE + 1):
-        pygame.draw.line(screen, LINE_COLOR, (0, i * CELL_SIZE), (SCREEN_WIDTH, i * CELL_SIZE), 1)
+        pygame.draw.line(screen, LINE_COLOR, (0, i * CELL_SIZE), (9*CELL_SIZE, i * CELL_SIZE), 1)
         pygame.draw.line(screen, LINE_COLOR, (i * CELL_SIZE, 0), (i * CELL_SIZE, SCREEN_HEIGHT), 1)
 
 
@@ -75,7 +81,7 @@ def draw_pieces(board):
         if piece:
             row = square // BOARD_SIZE
             col = square % BOARD_SIZE
-            text_color = (0, 0, 0) if piece.color == shogi.BLACK else (255, 255, 255)
+            text_color = BLACK if piece.color == shogi.BLACK else WHITE
             symbol = piece.symbol()
             text = font.render(symbol, True, text_color)
             text_rect = text.get_rect(center=(col * CELL_SIZE + CELL_SIZE // 2, row * CELL_SIZE + CELL_SIZE // 2))
@@ -355,6 +361,93 @@ def is_game_long_enugh(new_game_time, folder_path="Top10"):
         print(f"Błąd: {e}")
         return False
 
+def draw_margines():
+    """
+    Rysuje margines po prawej stronie planszy shogi z podziałem na rzędy.
+    """
+    # Górna i dolna linia marginesu
+    pygame.draw.line(screen, LINE_COLOR, (MARGINES_X, CELL_SIZE), (MARGINES_X1, CELL_SIZE))
+    pygame.draw.line(screen, LINE_COLOR, (MARGINES_X, 14 * CELL_SIZE), (MARGINES_X1, 14 * CELL_SIZE))
+
+    # Linie podziału na wiersze
+    for i in range(1, 15):  # Uwzględnij wszystkie 14 wierszy
+        pygame.draw.line(screen, LINE_COLOR, (MARGINES_X, CELL_SIZE + i * ROW_SIZE), (MARGINES_X1, CELL_SIZE + i * ROW_SIZE))
+
+        # Wyróżnij środkową linię
+        if i == 7:
+            pygame.draw.line(screen, LIGHT_COLOR, (MARGINES_X, CELL_SIZE + i * ROW_SIZE), (MARGINES_X1, CELL_SIZE + i * ROW_SIZE))
+
+
+def draw_captured_pieces(color):
+    """
+    Rysuje zbite figury wybranego gracza (czarnych lub białych) wraz z ich liczbą na marginesie.
+
+    Args:
+        color: Kolor gracza (BLACK dla czarnych, WHITE dla białych).
+    """
+    # Wybór figur na podstawie koloru
+    if color == BLACK:
+        pieces = convert_captured_to_symbols(get_captured_white())
+        text_start_y = CELL_SIZE + 7 * ROW_SIZE + 10
+        # Pozycja startowa dla białych
+    elif color == WHITE:
+        pieces = convert_captured_to_symbols(get_captured_black())
+        text_start_y = CELL_SIZE + 5  # Pozycja startowa dla czarnych
+    else:
+        raise ValueError("Nieznany kolor gracza: użyj BLACK lub WHITE.")
+
+    font = pygame.font.SysFont(None, 30)  # Czcionka domyślna, rozmiar 30
+
+    # Pozycja startowa dla tekstu
+    text_start_x = MARGINES_X + 10  # Przesunięcie od lewej strony marginesu
+
+    # Rysowanie zbitych figur
+    for i, (symbol, count) in enumerate(pieces.items()):
+        # Rysowanie symbolu figury
+        text_surface = font.render(f"{symbol}", True, color)
+        screen.blit(text_surface, (text_start_x, text_start_y + i * ROW_SIZE))
+
+        # Rysowanie liczby figur
+        count_surface = font.render(f"x{count}", True, color)
+        screen.blit(count_surface, (text_start_x + 40, text_start_y + i * ROW_SIZE))
+
+
+def get_captured_black():
+    """
+    Zwraca zbite figury czarnych (SENTE).
+
+    Args:
+        board (shogi.Board): Obiekt gry shogi.
+
+    Returns:
+        dict: Słownik z typami figur i ich liczbą.
+    """
+    return board.pieces_in_hand[shogi.BLACK]
+
+def get_captured_white():
+    """
+    Zwraca zbite figury białych (GOTE).
+
+    Args:
+        board (shogi.Board): Obiekt gry shogi.
+
+    Returns:
+        dict: Słownik z typami figur i ich liczbą.
+    """
+    return board.pieces_in_hand[shogi.WHITE]
+
+def convert_captured_to_symbols(captured_dict):
+    """
+    Konwertuje słownik zbitych figur na listę symboli.
+
+    Args:
+        captured_dict (dict): Słownik z typami figur i ich liczbą.
+
+    Returns:
+        dict: Słownik z symbolami figur jako kluczami i ich liczbą jako wartościami.
+    """
+    return {shogi.PIECE_SYMBOLS[piece]: count for piece, count in captured_dict.items()}
+
 
 undone_moves = []
 running = True
@@ -391,9 +484,9 @@ if __name__ == "__main__":
                 elif RECT_POS[0] + RECT_SIZE[0] // 2 <= x <= RECT_POS[0] + RECT_SIZE[0] and RECT_POS[1] <= y <= RECT_POS[1] + RECT_SIZE[1]:
                     selected_piece, selected_square = redo_last_move(undone_moves, selected_piece, selected_square)
 
-                elif SAVE_POS[0] <= x <= SAVE_POS[0] + SAVE_SIZE[0] and SAVE_POS[1] <= y <= SAVE_POS[1] + SAVE_SIZE[1]:
-                    save_game()
-                    show_save_confirmation(screen)
+                # elif SAVE_POS[0] <= x <= SAVE_POS[0] + SAVE_SIZE[0] and SAVE_POS[1] <= y <= SAVE_POS[1] + SAVE_SIZE[1]:
+                #     save_game()
+                #     show_save_confirmation(screen)
 
 
                 # Obsługa kliknięcia na planszy
@@ -411,6 +504,8 @@ if __name__ == "__main__":
 
                         move = shogi.Move(from_square=selected_square, to_square=square, promotion=promotion)
                         board.push(move)
+                        print("Zbite figury czarnych (SENTE):", convert_captured_to_symbols(get_captured_black()))
+                        print("Zbite figury białych (GOTE):", convert_captured_to_symbols(get_captured_white()))
                         undone_moves.clear()
 
                     selected_piece = None
@@ -422,6 +517,7 @@ if __name__ == "__main__":
                 if board.is_game_over():
                     game_over = True
                     end_time = time.time()  # Zapisz czas zakończenia gry
+                    end_time -= start_time
                     if is_game_long_enugh(end_time):
                         save_game(filename=f'Top10/{datetime.date.today()}.json', timex=int(end_time))
                     show_game_over_message()
@@ -441,9 +537,10 @@ if __name__ == "__main__":
         # Rysowanie
         if not game_over:
             screen.fill((0, 53, 0))
+            draw_margines()
+            draw_captured_pieces(WHITE)
+            draw_captured_pieces(BLACK)
             draw_back_button()
-            draw_save_button()
-            draw_load_button()
             draw_board()
             draw_pieces(board)
             pygame.display.flip()
