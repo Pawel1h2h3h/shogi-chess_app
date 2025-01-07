@@ -1,8 +1,13 @@
 import pygame
 import shogi
-from chess import draw_board, draw_pieces, draw_back_button, screen, RECT_POS, RECT_SIZE, show_load_confirmation
+from chess import draw_board, draw_pieces, draw_undo_redo_buttons, screen, RECT_POS, RECT_SIZE, show_load_confirmation
 import sys
 import json
+
+
+class LoadGameError(Exception):
+    def __init__(self, error) -> None:
+        super().__init__(f'Cannot load the game{error}')
 
 # Inicjalizacja pygame
 pygame.init()
@@ -11,7 +16,7 @@ pygame.font.init()
 
 def load_game(filename='Top10/saved_game.json'):
     """
-    Wczytuje partię z pliku JSON i ustawia stan planszy.
+    Wczytuje partię z pliku JSON.
 
     :param filename: Nazwa pliku z zapisem w formacie JSON
     :return: Lista ruchów i czas gry
@@ -35,15 +40,12 @@ def load_game(filename='Top10/saved_game.json'):
                 )
                 moves.append(move)
 
-            print(f"Partia wczytana z pliku: {filename}")
             return moves, game_time
 
-    except FileNotFoundError:
-        print(f"Błąd: Plik {filename} nie został znaleziony.")
-        return None, None
+    except FileNotFoundError as e:
+        raise LoadGameError(e)
     except json.JSONDecodeError:
-        print(f"Błąd: Nieprawidłowy format pliku JSON: {filename}")
-        return None, None
+        raise LoadGameError(e)
 
 
 def make_move():
@@ -54,9 +56,8 @@ def make_move():
         move = ALL_MOVES.pop(0)  # Pobiera pierwszy ruch z ALL_MOVES
         board.push(move)  # Wykonuje ruch na planszy
         DONE_MOVES.append(move)  # Dodaje ruch do listy DONE_MOVES
-        print(f"Ruch wykonany: {move}")
     else:
-        print("Brak ruchów do wykonania.")
+        pass
 
 def back_move():
     """
@@ -66,9 +67,8 @@ def back_move():
         move = DONE_MOVES.pop()  # Pobiera ostatni ruch z DONE_MOVES
         board.pop()  # Cofnięcie ruchu na planszy
         ALL_MOVES.insert(0, move)  # Dodaje cofnięty ruch na początek ALL_MOVES
-        print(f"Ruch cofnięty: {move}")
     else:
-        print("Brak ruchów do cofnięcia.")
+        pass
 
 def redo_move():
     """
@@ -78,9 +78,8 @@ def redo_move():
         move = BACKED_MOVES.pop(0)  # Pobiera pierwszy cofnięty ruch
         board.push(move)  # Wykonuje ruch na planszy
         DONE_MOVES.append(move)  # Dodaje ruch do DONE_MOVES
-        print(f"Ruch ponownie wykonany: {move}")
     else:
-        print("Brak ruchów do ponownego wykonania.")
+        pass
 
 
 
@@ -88,15 +87,15 @@ highlighted_squares = []
 running = True
 game_over = False
 message_showed = False
-board = shogi.Board()
-
 DONE_MOVES = []  # Ruchy, które zostały już wykonane
 BACKED_MOVES = []  # Cofnięte ruchy
+
+board = shogi.Board()
 
 
 if __name__ == "__main__":
     game_file = sys.argv[1]
-    ALL_MOVES, TIME = load_game(game_file)
+    ALL_MOVES, TIME = load_game(f'{game_file[:30]}.json')
 
     # Pętla gry
     while running:
@@ -114,12 +113,10 @@ if __name__ == "__main__":
                 elif RECT_POS[0] + RECT_SIZE[0] // 2 <= x <= RECT_POS[0] + RECT_SIZE[0] and RECT_POS[1] <= y <= RECT_POS[1] + RECT_SIZE[1]:
                     make_move()
 
-
-
         # Rysowanie
         if not game_over:
-            screen.fill((0, 53, 0))
-            draw_back_button()
+            screen.fill((149, 165, 166))
+            draw_undo_redo_buttons()
             draw_board()
             draw_pieces(board)
             if not message_showed:

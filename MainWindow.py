@@ -11,7 +11,7 @@ BUTTON_WIDTH, BUTTON_HEIGHT = 200, 50
 # Kolory
 WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
-GRAY = (200, 200, 200)
+GRAY = (149, 165, 166)
 
 # Inicjalizacja Pygame
 pygame.init()
@@ -19,24 +19,39 @@ screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 pygame.display.set_caption("SHOGI")
 clock = pygame.time.Clock()
 
+# Załaduj obrazek tła
+background_image = pygame.image.load("background.jpg")
+
+# Skalowanie obrazka do rozmiaru okna (opcjonalne)
+background_image = pygame.transform.scale(background_image, (SCREEN_WIDTH, SCREEN_HEIGHT))
+
 # Funkcja do sprawdzenia, czy kliknięcie jest w przycisku
 def in_button(mouse_pos, width, height, pos):
+    """
+    Returns:
+        bool: True gdy przycisk został kliknięty, False gdy warunek nie został spełnony.
+    """
     mouse_x, mouse_y = mouse_pos
     button_x, button_y = pos
     return button_x <= mouse_x <= button_x + width and button_y <= mouse_y <= button_y + height
 
 # Rysowanie przycisku
 def draw_button(x, y, width, height, text, font_size=24):
+    """
+    Rysuje przycisk
+    """
     pygame.draw.rect(screen, GRAY, (x, y, width, height))
     font = pygame.font.SysFont("Arial", font_size)
     text_surface = font.render(text, True, BLACK)
     text_rect = text_surface.get_rect(center=(x + width // 2, y + height // 2))
     screen.blit(text_surface, text_rect)
 
-# Główna pętla gry
+
 running = True
-top_10_clicked = False  # Zmienna do śledzenia stanu kliknięcia "TOP 10"
+top_10_clicked = False
 buttons = []
+
+# Główna pętla okna
 if __name__ == '__main__':
 
     while running:
@@ -63,6 +78,7 @@ if __name__ == '__main__':
 
         # Rysowanie elementów
         screen.fill(WHITE)
+        screen.blit(background_image, (0, 0))
 
         # Rysowanie przycisków
         button_x = (SCREEN_WIDTH - BUTTON_WIDTH) // 2
@@ -77,9 +93,9 @@ if __name__ == '__main__':
             all_files = [f for f in os.listdir('Top10') if f.endswith(".json")]
             for filename in all_files:
                 height += 30
-                button_name = f'{filename}'
-                buttons.append({'rect': pygame.Rect(20, height, BUTTON_WIDTH // 2, BUTTON_HEIGHT // 2), 'name': button_name})
-                draw_button(20, height, BUTTON_WIDTH // 2, BUTTON_HEIGHT // 2, button_name, 10)
+                button_name = f'{filename.removesuffix(".json")[:24]}'
+                buttons.append({'rect': pygame.Rect(20, height, (BUTTON_WIDTH +20)// 2, BUTTON_HEIGHT // 2), 'name': button_name})
+                draw_button(20, height, (BUTTON_WIDTH + 20) // 2, BUTTON_HEIGHT // 2, button_name, 10)
 
 
         pygame.display.flip()
