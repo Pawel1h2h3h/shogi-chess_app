@@ -37,7 +37,6 @@ def draw_button(x, y, width, height, text, font_size=24):
 running = True
 top_10_clicked = False  # Zmienna do śledzenia stanu kliknięcia "TOP 10"
 buttons = []
-
 if __name__ == '__main__':
 
     while running:

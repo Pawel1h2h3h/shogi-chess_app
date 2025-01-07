@@ -1,12 +1,12 @@
 import pygame
 import shogi
-from chess import CELL_SIZE, draw_board, draw_pieces, draw_back_button, screen, RECT_POS, RECT_SIZE
+from chess import draw_board, draw_pieces, draw_back_button, screen, RECT_POS, RECT_SIZE, show_load_confirmation
 import sys
 import json
 
 # Inicjalizacja pygame
 pygame.init()
-pygame.font.init()  # Upewnij się, że czcionki zostały zainicjalizowane
+pygame.font.init()
 
 
 def load_game(filename='Top10/saved_game.json'):
@@ -87,6 +87,7 @@ def redo_move():
 highlighted_squares = []
 running = True
 game_over = False
+message_showed = False
 board = shogi.Board()
 
 DONE_MOVES = []  # Ruchy, które zostały już wykonane
@@ -113,12 +114,16 @@ if __name__ == "__main__":
                 elif RECT_POS[0] + RECT_SIZE[0] // 2 <= x <= RECT_POS[0] + RECT_SIZE[0] and RECT_POS[1] <= y <= RECT_POS[1] + RECT_SIZE[1]:
                     make_move()
 
+
+
         # Rysowanie
         if not game_over:
             screen.fill((0, 53, 0))
             draw_back_button()
             draw_board()
             draw_pieces(board)
+            if not message_showed:
+                message_showed = show_load_confirmation(screen)
             pygame.display.flip()
 
     pygame.quit()

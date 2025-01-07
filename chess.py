@@ -201,13 +201,12 @@ def get_king_square_in_check():
         return king_square
     return None
 
-#ROZRÓŻNIC GAME OVER
-def show_message(message = f"GAME OVER"):
+def show_message(message="GAME OVER", size=48, color=WHITE):
     """
-    Wyświetla komunikat o zakończeniu gry.
+    Wyświetla komunikat.
     """
     font = pygame.font.SysFont("Arial", 48, bold=True)
-    text = font.render(message, True, (255, 255, 255))  # Biały tekst
+    text = font.render(message, True, color)  # Biały tekst
     text_rect = text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2))
 
     # Rysowanie komunikatu na ekranie
@@ -259,7 +258,7 @@ def redo_last_move(undone_moves, selected_piece, selected_square):
     return selected_piece, selected_square
 
 
-def save_game(filename="Top10/saved_game.json", timex=10):
+def save_game(date, filename="Top10/saved_game.json", timex=10):
     """
     Zapisuje aktualny stan partii do pliku w formacie JSON oraz wszystkie wykonane ruchy.
 
@@ -267,6 +266,7 @@ def save_game(filename="Top10/saved_game.json", timex=10):
     :param timex: Czas partii
     """
     data = {
+        "date": date,
         "time": timex,
         "moves": []  # Lista ruchów
     }
@@ -285,11 +285,65 @@ def save_game(filename="Top10/saved_game.json", timex=10):
             # Zapis danych do pliku JSON
             json.dump(data, file, indent=4)
 
-        print(f"Partia została zapisana do pliku: {filename}")
+        show_save_confirmation()
     except IOError as e:
         print(f"Błąd podczas zapisywania partii: {e}")
 
-def show_save_confirmation(screen):
+
+def rename_and_clean_top_games(directory_path):
+    """
+    Przetwarza pliki z zapisami partii, sortuje według czasu gry i:
+    - Nadaje nazwy Top1_DATE.json do Top10_DATE.json dla 10 najdłuższych partii,
+      gdzie DATE pochodzi z klucza 'date' w pliku JSON.
+    - Usuwa pliki, które nie mieszczą się w Top10, jeśli plików jest więcej niż 10.
+
+    Args:
+        directory_path (str): Ścieżka do katalogu z plikami JSON partii.
+    """
+    games = []
+
+    # Przetwarzanie plików w katalogu
+    for file_name in os.listdir(directory_path):
+        file_path = os.path.join(directory_path, file_name)
+
+        # Wczytaj plik JSON
+        if file_name.endswith('.json'):
+            try:
+                with open(file_path, 'r') as file:
+                    data = json.load(file)
+                    if 'time' in data and 'date' in data:  # Sprawdź, czy plik zawiera czas i datę
+                        games.append((file_name, data['time'], data['date']))
+            except Exception as e:
+                print(f"Problem z plikiem {file_name}: {e}")
+
+    # Sortowanie partii według czasu gry (malejąco)
+    games.sort(key=lambda x: x[1], reverse=True)
+
+    # Zmień nazwy dla 10 najdłuższych partii
+    for i, (file_name, game_time, game_date) in enumerate(games[:10]):
+        new_name = f"Top{i+1}_{game_date}.json"
+        old_path = os.path.join(directory_path, file_name)
+        new_path = os.path.join(directory_path, new_name)
+        try:
+            os.rename(old_path, new_path)
+        except Exception as e:
+            pass
+
+    # Usuwanie pozostałych plików (tylko jeśli jest więcej niż 10 partii)
+    if len(games) > 10:
+        for file_name, game_time, game_date in games[10:]:
+            file_path = os.path.join(directory_path, file_name)
+            try:
+                os.remove(file_path)
+                print(f"Usunięto plik: {file_name}")
+            except Exception as e:
+                print(f"Nie udało się usunąć pliku {file_name}: {e}")
+    else:
+        print("Liczba partii nie przekracza 10. Żadne pliki nie zostały usunięte.")
+
+
+
+def show_save_confirmation():
     """
     Wyświetla komunikat o pomyślnym zapisaniu partii na ekranie.
 
@@ -325,6 +379,7 @@ def show_load_confirmation(screen):
     screen.blit(message, (SCREEN_WIDTH // 2 - message.get_width() // 2, SCREEN_HEIGHT - 50))
     pygame.display.flip()
     pygame.time.wait(2000)  # Wyświetl przez 2 sekundy
+    return True
 
 def is_game_long_enugh(new_game_time, folder_path="Top10"):
     """
@@ -379,7 +434,7 @@ def draw_margines():
             pygame.draw.line(screen, LIGHT_COLOR, (MARGINES_X, CELL_SIZE + i * ROW_SIZE), (MARGINES_X1, CELL_SIZE + i * ROW_SIZE))
 
 
-def draw_captured_pieces(color, board=board):
+def draw_captured_pieces(color):
     """
     Rysuje zbite figury wybranego gracza (czarnych lub białych) wraz z ich liczbą na marginesie.
 
@@ -511,22 +566,20 @@ def place_piece_on_board(color, piece_type, target_square):
     """
     # Sprawdź, czy wybrane pole jest puste
     if board.piece_at(target_square) is not None:
-        print("Pole jest zajęte. Nie można dostawić figury.")
         return False
 
     # Sprawdź, czy gracz ma daną figurę w marginesie
     if not board.has_piece_in_hand(piece_type, color):
-        print("Nie masz tej figury w marginesie.")
         return False
 
     # Wykonaj ruch dostawienia figury na planszę
     move = shogi.Move(from_square=None, to_square=target_square, promotion=False, drop_piece_type=piece_type)
     if board.is_legal(move):
         board.push(move)
+        return True
     else:
         show_message("illegal move - try something else")
-    print(f"Dostawiono figurę {shogi.PIECE_SYMBOLS[piece_type]} na pole {target_square}.")
-    return True
+
 
 
 
@@ -556,6 +609,8 @@ if __name__ == "__main__":
                 if not add_mode:
                     if y < 9 * CELL_SIZE and x < 9 * CELL_SIZE:
                         square = (y // CELL_SIZE) * BOARD_SIZE + (x // CELL_SIZE)
+                    else:
+                        square = 1
                 else:
                     if y < 9 * CELL_SIZE and x < 9 * CELL_SIZE:
                         square = (y // CELL_SIZE) * BOARD_SIZE + (x // CELL_SIZE)
@@ -579,7 +634,7 @@ if __name__ == "__main__":
                         symbol, count, piece_type, color = is_margin_square_occupied(margin_square)
                         add_piece_data = piece_type, color
                     else:
-                        print('pole jest puste')
+                        show_message("U have no piece to drop", 34, PURPLE)
 
 
 
@@ -617,15 +672,17 @@ if __name__ == "__main__":
                     end_time = time.time()  # Zapisz czas zakończenia gry
                     end_time -= start_time
                     if is_game_long_enugh(end_time):
-                        save_game(filename=f'Top10/{datetime.date.today()}.json', timex=int(end_time))
+                        save_game(date=str(datetime.date.today()), filename=f'Top10/game.json', timex=int(end_time))
+                        rename_and_clean_top_games('Top10')
                     show_message()
+                    running = False
 
         # Obliczanie czasu gry
         if start_time is not None:
             if end_time is None:
                 elapsed_time = time.time() - start_time  # Gra w toku
             else:
-                elapsed_time = end_time - start_time  # Gra zakończona
+                elapsed_time = end_time
         else:
             elapsed_time = 0  # Wyświetla 00:00 przed pierwszym ruchem
 
@@ -645,13 +702,3 @@ if __name__ == "__main__":
 
     pygame.quit()
     sys.exit()
-                # Kliknięcie na marginesie
-
-                    # if margin_square is not None:
-                    #     color = shogi.WHITE if margin_square < 7 else shogi.BLACK
-                    #     occupied = is_margin_square_occupied(margin_square, color)
-                    #     if occupied:
-                    #         symbol, count, selected_piece_type = occupied
-                    #         print(f"Wybrano figurę {selected_piece_type} {color}.")
-                    #         selected_color = color
-                    #         selected_piece_type_to_add = selected_piece_type
