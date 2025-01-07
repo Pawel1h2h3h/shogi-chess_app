@@ -12,7 +12,7 @@ import datetime
 
 # Ustawienia planszy
 CELL_SIZE = 80
-SCREEN_WIDTH, SCREEN_HEIGHT = 13*CELL_SIZE, 9*CELL_SIZE
+SCREEN_WIDTH, SCREEN_HEIGHT = 10*CELL_SIZE, 9*CELL_SIZE
 BOARD_SIZE = 9
 
 
@@ -25,6 +25,7 @@ LINE_COLOR = (0, 0, 0)
 GREY = (200, 200, 200)
 BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
+PURPLE = (73, 50, 103)
 
 # Ustawienie marginesu
 RECT_POS = CELL_SIZE*9 + 10, 10
@@ -201,12 +202,11 @@ def get_king_square_in_check():
     return None
 
 #ROZRÓŻNIC GAME OVER
-def show_game_over_message():
+def show_message(message = f"GAME OVER"):
     """
     Wyświetla komunikat o zakończeniu gry.
     """
     font = pygame.font.SysFont("Arial", 48, bold=True)
-    message = f"GAME OVER"
     text = font.render(message, True, (255, 255, 255))  # Biały tekst
     text_rect = text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2))
 
@@ -277,7 +277,8 @@ def save_game(filename="Top10/saved_game.json", timex=10):
                 move_data = {
                     "from": move.from_square,
                     "to": move.to_square,
-                    "promo": move.promotion
+                    "promo": move.promotion,
+                    "dropped_type": move.drop_piece_type
                 }
                 data["moves"].append(move_data)
 
@@ -378,7 +379,7 @@ def draw_margines():
             pygame.draw.line(screen, LIGHT_COLOR, (MARGINES_X, CELL_SIZE + i * ROW_SIZE), (MARGINES_X1, CELL_SIZE + i * ROW_SIZE))
 
 
-def draw_captured_pieces(color):
+def draw_captured_pieces(color, board=board):
     """
     Rysuje zbite figury wybranego gracza (czarnych lub białych) wraz z ich liczbą na marginesie.
 
@@ -387,11 +388,11 @@ def draw_captured_pieces(color):
     """
     # Wybór figur na podstawie koloru
     if color == BLACK:
-        pieces = convert_captured_to_symbols(get_captured_white())
+        pieces = convert_captured_to_symbols(get_captured_black())
         text_start_y = CELL_SIZE + 7 * ROW_SIZE + 10
         # Pozycja startowa dla białych
     elif color == WHITE:
-        pieces = convert_captured_to_symbols(get_captured_black())
+        pieces = convert_captured_to_symbols(get_captured_white())
         text_start_y = CELL_SIZE + 5  # Pozycja startowa dla czarnych
     else:
         raise ValueError("Nieznany kolor gracza: użyj BLACK lub WHITE.")
@@ -416,9 +417,6 @@ def get_captured_black():
     """
     Zwraca zbite figury czarnych (SENTE).
 
-    Args:
-        board (shogi.Board): Obiekt gry shogi.
-
     Returns:
         dict: Słownik z typami figur i ich liczbą.
     """
@@ -427,9 +425,6 @@ def get_captured_black():
 def get_captured_white():
     """
     Zwraca zbite figury białych (GOTE).
-
-    Args:
-        board (shogi.Board): Obiekt gry shogi.
 
     Returns:
         dict: Słownik z typami figur i ich liczbą.
@@ -449,6 +444,92 @@ def convert_captured_to_symbols(captured_dict):
     return {shogi.PIECE_SYMBOLS[piece]: count for piece, count in captured_dict.items()}
 
 
+def get_clicked_margin_square(x, y):
+    """
+    Zwraca indeks pola na marginesie, na które kliknięto.
+
+    Args:
+        pos (tuple): Współrzędne kliknięcia myszy (x, y).
+
+    Returns:
+        int: Indeks klikniętego pola (0-13) lub None, jeśli kliknięto poza marginesem.
+    """
+
+    # Sprawdź, czy kliknięcie było na marginesie
+    if MARGINES_X <= x <= MARGINES_X1 and CELL_SIZE <= y <= 14 * CELL_SIZE:
+        # Oblicz indeks klikniętego pola
+        row_index = (y - CELL_SIZE) // ROW_SIZE
+        return int(row_index)  # Zwróć indeks pola (0-13)
+
+    return None  # Kliknięcie poza marginesem
+
+
+def is_margin_square_occupied(margin_square):
+    """
+    Sprawdza, czy na klikniętym polu marginesu znajduje się figura.
+
+    Args:
+        margin_square (int): Indeks pola na marginesie (0-13).
+        color: Kolor gracza (shogi.BLACK lub shogi.WHITE).
+
+    Returns:
+        tuple: (symbol figury, liczba figur, typ figury, kolor) jeśli pole jest zajęte, inaczej None.
+    """
+    # Pobierz zbite figury białych lub czarnych
+    if margin_square < 7:
+        captured_pieces = get_captured_white()
+        local_index = margin_square  # Indeks dla białych (0-6)
+        color = shogi.WHITE
+    else:
+        captured_pieces = get_captured_black()
+        local_index = margin_square - 7  # Indeks dla czarnych (7-13 -> 0-6)
+        color = shogi.BLACK
+
+    # Konwertuj zbite figury na listę
+    captured_list = list(captured_pieces.items())
+
+    # Sprawdź, czy pole mieści się w liczbie figur
+    if local_index < len(captured_list):
+        piece_type, count = captured_list[local_index]
+        symbol = shogi.PIECE_SYMBOLS[piece_type]
+        return symbol, count, piece_type, color  # Zwróć symbol, liczbę figur i typ figury
+
+    return None  # Pole jest puste
+
+def place_piece_on_board(color, piece_type, target_square):
+    """
+    Dostawia figurę z marginesu na planszę.
+
+    Args:
+        board (shogi.Board): Obiekt planszy shogi.
+        color: Kolor gracza (shogi.BLACK lub shogi.WHITE).
+        piece_type: Typ figury do dostawienia (np. shogi.PAWN, shogi.ROOK).
+        target_square: Pole, na które figura ma zostać dostawiona (0–80).
+
+    Returns:
+        bool: True, jeśli figura została pomyślnie dostawiona, inaczej False.
+    """
+    # Sprawdź, czy wybrane pole jest puste
+    if board.piece_at(target_square) is not None:
+        print("Pole jest zajęte. Nie można dostawić figury.")
+        return False
+
+    # Sprawdź, czy gracz ma daną figurę w marginesie
+    if not board.has_piece_in_hand(piece_type, color):
+        print("Nie masz tej figury w marginesie.")
+        return False
+
+    # Wykonaj ruch dostawienia figury na planszę
+    move = shogi.Move(from_square=None, to_square=target_square, promotion=False, drop_piece_type=piece_type)
+    if board.is_legal(move):
+        board.push(move)
+    else:
+        show_message("illegal move - try something else")
+    print(f"Dostawiono figurę {shogi.PIECE_SYMBOLS[piece_type]} na pole {target_square}.")
+    return True
+
+
+
 undone_moves = []
 running = True
 selected_piece = None
@@ -458,6 +539,8 @@ king_in_check_square = None
 game_over = False
 start_time = None
 end_time = None  # Czas zakończenia gry, początkowo None
+add_mode = False
+add_piece_data = None
 
 if __name__ == "__main__":
     pygame.init()
@@ -469,12 +552,16 @@ if __name__ == "__main__":
                 running = False
             elif not game_over and event.type == pygame.MOUSEBUTTONDOWN:
                 x, y = pygame.mouse.get_pos()
-                if y < 9 * CELL_SIZE and x < 9 * CELL_SIZE:
-                    square = (y // CELL_SIZE) * BOARD_SIZE + (x // CELL_SIZE)
 
-                # Rozpoczęcie liczenia czasu przy pierwszym ruchu
-                if start_time is None:
-                    start_time = time.time()
+                if not add_mode:
+                    if y < 9 * CELL_SIZE and x < 9 * CELL_SIZE:
+                        square = (y // CELL_SIZE) * BOARD_SIZE + (x // CELL_SIZE)
+                else:
+                    if y < 9 * CELL_SIZE and x < 9 * CELL_SIZE:
+                        square = (y // CELL_SIZE) * BOARD_SIZE + (x // CELL_SIZE)
+                        piece_type, color = add_piece_data
+                        place_piece_on_board(color, piece_type, target_square=square)
+                        add_mode = False
 
                 # Obsługa przycisku "Cofnij"
                 if RECT_POS[0] <= x <= RECT_POS[0] + RECT_SIZE[0] // 2 and RECT_POS[1] <= y <= RECT_POS[1] + RECT_SIZE[1]:
@@ -484,33 +571,44 @@ if __name__ == "__main__":
                 elif RECT_POS[0] + RECT_SIZE[0] // 2 <= x <= RECT_POS[0] + RECT_SIZE[0] and RECT_POS[1] <= y <= RECT_POS[1] + RECT_SIZE[1]:
                     selected_piece, selected_square = redo_last_move(undone_moves, selected_piece, selected_square)
 
-                # elif SAVE_POS[0] <= x <= SAVE_POS[0] + SAVE_SIZE[0] and SAVE_POS[1] <= y <= SAVE_POS[1] + SAVE_SIZE[1]:
-                #     save_game()
-                #     show_save_confirmation(screen)
+                # Obsługa kliknięcia na margines
+                if y > CELL_SIZE and x > 9 * CELL_SIZE:
+                    margin_square = get_clicked_margin_square(x, y)
+                    if is_margin_square_occupied(margin_square):
+                        add_mode = True
+                        symbol, count, piece_type, color = is_margin_square_occupied(margin_square)
+                        add_piece_data = piece_type, color
+                    else:
+                        print('pole jest puste')
+
+
 
 
                 # Obsługa kliknięcia na planszy
-                elif selected_piece is None:
-                    piece = find_piece(square)
-                    if piece is not None:
-                        selected_piece = piece
-                        selected_square = square
-                        highlighted_squares = get_legal_moves(square)
-                else:
-                    if square in highlighted_squares:
-                        promotion = False
-                        if is_in_promotion_zone(square, selected_piece.color) and not selected_piece.is_promoted():
-                            promotion = ask_for_promotion_gui()
+                if not add_mode:
+                    if selected_piece is None:
+                        piece = find_piece(square)
+                        if piece is not None:
+                            selected_piece = piece
+                            selected_square = square
+                            highlighted_squares = get_legal_moves(square)
+                    else:
+                        if square in highlighted_squares:
+                            promotion = False
+                            if is_in_promotion_zone(square, selected_piece.color) and not selected_piece.is_promoted():
+                                promotion = ask_for_promotion_gui()
 
-                        move = shogi.Move(from_square=selected_square, to_square=square, promotion=promotion)
-                        board.push(move)
-                        print("Zbite figury czarnych (SENTE):", convert_captured_to_symbols(get_captured_black()))
-                        print("Zbite figury białych (GOTE):", convert_captured_to_symbols(get_captured_white()))
-                        undone_moves.clear()
+                            move = shogi.Move(from_square=selected_square, to_square=square, promotion=promotion)
+                            board.push(move)
+                            undone_moves.clear()
 
-                    selected_piece = None
-                    selected_square = None
-                    highlighted_squares = []
+                            # Rozpoczęcie liczenia czasu przy pierwszym ruchu
+                            if start_time is None:
+                                start_time = time.time()
+
+                        selected_piece = None
+                        selected_square = None
+                        highlighted_squares = []
 
                 king_in_check_square = get_king_square_in_check()
 
@@ -520,7 +618,7 @@ if __name__ == "__main__":
                     end_time -= start_time
                     if is_game_long_enugh(end_time):
                         save_game(filename=f'Top10/{datetime.date.today()}.json', timex=int(end_time))
-                    show_game_over_message()
+                    show_message()
 
         # Obliczanie czasu gry
         if start_time is not None:
@@ -547,4 +645,13 @@ if __name__ == "__main__":
 
     pygame.quit()
     sys.exit()
+                # Kliknięcie na marginesie
 
+                    # if margin_square is not None:
+                    #     color = shogi.WHITE if margin_square < 7 else shogi.BLACK
+                    #     occupied = is_margin_square_occupied(margin_square, color)
+                    #     if occupied:
+                    #         symbol, count, selected_piece_type = occupied
+                    #         print(f"Wybrano figurę {selected_piece_type} {color}.")
+                    #         selected_color = color
+                    #         selected_piece_type_to_add = selected_piece_type

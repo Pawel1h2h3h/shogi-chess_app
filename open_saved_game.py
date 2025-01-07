@@ -30,7 +30,8 @@ def load_game(filename='Top10/saved_game.json'):
                 move = shogi.Move(
                     from_square=move_params["from"],
                     to_square=move_params["to"],
-                    promotion=move_params["promo"]
+                    promotion=move_params["promo"],
+                    drop_piece_type=move_params["dropped_type"]
                 )
                 moves.append(move)
 

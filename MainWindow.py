@@ -2,8 +2,7 @@ import pygame
 import sys
 import subprocess
 import os
-import json
-import shogi
+
 
 # Ustawienia okna
 SCREEN_WIDTH, SCREEN_HEIGHT = 800, 600
