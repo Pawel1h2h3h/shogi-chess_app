@@ -22,10 +22,11 @@ class Button(pygame.Rect):
         self.text = text if text else None
         self.color = color if color else None
 
-    def draw(self, surface, font, text_color):
+    def draw(self, surface, font_type='Arial', font_size=24, text_color=BLACK):
         pygame.draw.rect(surface, self.color, self)
 
         if self.text:
+            font = pygame.font.SysFont(font_type, font_size, bold=True)
             text_surface = font.render(self.text, True, text_color)
             text_rect = text_surface.get_rect(center=self.center)
             surface.blit(text_surface, text_rect)
@@ -34,24 +35,6 @@ class Button(pygame.Rect):
         return self.collidepoint(pos)
 
 
-class Window:
-    def __init__(self) -> None:
-        self.screen = pygame.display.set_mode()
-
-    def draw_button(self, pos, size, text, font_size=24):
-        """
-        Rysuje przycisk
-        """
-        x, y = pos
-        width, height = size
-        pygame.draw.rect(self.screen, GRAY, (x, y, width, height))
-        font = pygame.font.SysFont("Arial", font_size)
-        text_surface = font.render(text, True, BLACK)
-        text_rect = text_surface.get_rect(center=(x + width // 2, y + height // 2))
-        self.screen.blit(text_surface, text_rect)
-
-    # Funkcja do sprawdzenia, czy kliknięcie jest w przycisku
-    def in_button(self, mouse_pos, button_size, button_pos):
         """
         Returns:
             bool: True gdy przycisk został kliknięty, False gdy warunek nie został spełnony.
@@ -62,15 +45,15 @@ class Window:
         return button_x <= mouse_x <= button_x + width and button_y <= mouse_y <= button_y + height
 
 
-class MainWindow(Window):
-    def __init__(self) -> None:
-        super().__init__()
-        self.screen_size = 800, 600
-        self.start = self.create_start()
+class MainWindow:
+    def __init__(self, size) -> None:
+        self.screen_size = size
+        self.start_button = self.create_start()
+        self.top10_button = self.create_top10()
 
         self.top10_clicked = False
         self.screen = pygame.display.set_mode(self.screen_size)
-        self.game_buttons = []
+        self.game_buttons = self.create_game_buttons()
 
     def create_start(self):
         screen_width, screen_height = self.screen_size
@@ -83,12 +66,6 @@ class MainWindow(Window):
         y = self.screen_size[1]//30
         return Button(x, y, 200, 50, 'Top 10', GRAY)
 
-    def draw_top10(self):
-        self.draw_button(pos=self.top10_pos(), size=self.top10_size, text='TOP 10')
-        if self.top10_clicked:
-            self.create_games_buttons()
-            self.draw_top_10_game_buttons()
-
     def bg_image(self, path="background.jpg"):
         bg_image = pygame.image.load(path)
         bg_image = pygame.transform.scale(bg_image, self.screen_size)
@@ -99,42 +76,49 @@ class MainWindow(Window):
             # Uruchom plik jako osobny proces
             subprocess.run(["python", "chess.py"])
 
-    def change_top10_clicked(self):
+    def change_top10_status(self):
         self.top10_clicked = not self.top10_clicked
 
-    def create_games_buttons(self, path='Top10'):
+    def update_game_buttons(self):
+        self.game_buttons = self.create_game_buttons()
+
+    def create_game_buttons(self, path='Top10'):
+        game_buttons = []
         all_files = [f for f in os.listdir(path) if f.endswith(".json")]
-        width, height = self.game_button_size()
-        l=0
+        width, height = self.calculate_game_button_size()
+        y = 3*self.top10_button.y
         for filename in all_files:
-            l += 30
+            y += 2*self.top10_button.y
             button_name = f'{filename.removesuffix(".json")[:24]}'
-            self.game_buttons.append({'rect': pygame.Rect(self.top10_pos()[0], l, width, height), 'name': button_name})
+            x = self.top10_button.centerx - 3*self.top10_button.x
+            button = Button(x, y, width, height, button_name, GRAY)
+            game_buttons.append(button)
+        return game_buttons
 
-    def draw_top_10_game_buttons(self):
+    def calculate_game_button_size(self):
+        width, hight = 200, 50
+        width = (width + 20)//2
+        hight = hight//2
+        return width, hight
+
+    def open_saved_games(self, pos):
         for button in self.game_buttons:
-            pygame.draw.rect(self.screen, BLACK, button['rect'])
-
-
-    def saved_games(self, pos):
-        for button in self.game_buttons:
-            if button['rect'].collidepoint(pos):
-                game_file = f'Top10/{button["name"]}'
+            if button.clicked(pos):
+                game_file = f'Top10/{button.text}'
                 subprocess.run(["python", "open_saved_game.py", game_file])
 
-    def game_button_size(self):
-        x, y = self.top10_size
-        x = (x + 20)//2
-        y = y//2
-        return x, y
-
-    def draw_game_button(self, name, pos):
-        self.draw_button(pos, size=self.game_button_size(), text=name, font_size=10)
-
+    def draw_myself(self):
+        self.bg_image()
+        self.top10_button.draw(self.screen)
+        self.start_button.draw(self.screen)
+        if self.top10_clicked:
+            self.update_game_buttons()
+            for button in self.game_buttons:
+                button.draw(self.screen, font_size=14)
 
 def main():
     pygame.init()
-    window = MainWindow()
+    window = MainWindow((900, 800))
 
     running = True
     while running:
@@ -143,16 +127,15 @@ def main():
                 running = False
             elif event.type == pygame.MOUSEBUTTONDOWN:
 
-                if window.in_start_button(event.pos):
+                if window.start_button.clicked(event.pos):
                     window.start_game()
+                if window.top10_button.clicked(event.pos):
+                    window.change_top10_status()
 
-                if window.in_top10_button(event.pos):
-                    window.change_top10_clicked()
+                window.open_saved_games(event.pos)
 
 
-        window.bg_image()
-        window.draw_top10()
-        window.draw_start()
+        window.draw_myself()
         pygame.display.flip()
 
     pygame.quit()
