@@ -17,12 +17,13 @@ GRAY = (149, 165, 166)
 
 
 class Button(pygame.Rect):
-    def __init__(self, x, y, width, height, text, color):
+    def __init__(self, x, y, width, height, text=None, color=None, id=None):
         super().__init__(x, y, width, height)
         self.text = text if text else None
         self.color = color if color else None
+        self.id = id
 
-    def draw(self, surface, font_type='Arial', font_size=24, text_color=BLACK):
+    def draw(self, surface, text_color=BLACK, font_type='Arial', font_size=24):
         pygame.draw.rect(surface, self.color, self)
 
         if self.text:
@@ -31,18 +32,24 @@ class Button(pygame.Rect):
             text_rect = text_surface.get_rect(center=self.center)
             surface.blit(text_surface, text_rect)
 
+    def set_color(self, new_color):
+        self.color = new_color
+
+    def set_text(self, new_text):
+        self.text = new_text
+
     def clicked(self, pos):
         return self.collidepoint(pos)
 
+    def __eq__(self, other) -> bool:
+        if isinstance(other, Button):
+            return self.id == other.id
+        return False
 
-        """
-        Returns:
-            bool: True gdy przycisk został kliknięty, False gdy warunek nie został spełnony.
-        """
-        width, height = button_size
-        mouse_x, mouse_y = mouse_pos
-        button_x, button_y = button_pos
-        return button_x <= mouse_x <= button_x + width and button_y <= mouse_y <= button_y + height
+    def __str__(self):
+        return f"{self.id}"
+
+
 
 
 class MainWindow:
@@ -109,7 +116,7 @@ class MainWindow:
 
     def draw_myself(self):
         self.bg_image()
-        self.top10_button.draw(self.screen)
+        self.top10_button.draw(self.screen, text_color=WHITE)
         self.start_button.draw(self.screen)
         if self.top10_clicked:
             self.update_game_buttons()
@@ -118,7 +125,7 @@ class MainWindow:
 
 def main():
     pygame.init()
-    window = MainWindow((900, 800))
+    window = MainWindow((800, 700))
 
     running = True
     while running:
@@ -140,8 +147,8 @@ def main():
 
     pygame.quit()
 
-if __name__ == "__main__":
-    main()
+# if __name__ == "__main__":
+#     main()
 
 
 # Inicjalizacja Pygame

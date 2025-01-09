@@ -6,6 +6,7 @@ import time
 import json
 import os
 import datetime
+from MainWindow import Button
 
 
 class SaveGameError(Exception):
@@ -48,11 +49,166 @@ MARGINES_X1 = MARGINES_X + 10 * CELL_SIZE  # Koniec marginesu w osi X
 ROW_SIZE = 8 * CELL_SIZE / 14  # Wysokość każdego wiersza marginesu
 
 # Utworzenie okna gry
-screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-pygame.display.set_caption("Shogi")
+# screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+# pygame.display.set_caption("Shogi")
 
 # Inicjalizacja stanu gry Shogi
 board = shogi.Board()
+
+class GameWindow:
+    def __init__(self) -> None:
+        self.squares = []
+        self.board_size = 9
+        self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+
+        self.king_square = None
+        self.selected_piece = None
+        self.legal_moves = False
+        self.selected_square = None
+        self.promotion = False
+        self.undone_moves = []
+
+        self.add_mode = False
+        self.game_over = False
+        self.start_time = None
+
+    def draw_board_lines(self):
+        for i in range(self.board_size + 1):
+            pygame.draw.line(self.screen, LINE_COLOR, (0, i * CELL_SIZE), (9*CELL_SIZE, i * CELL_SIZE), 1)
+            pygame.draw.line(self.screen, LINE_COLOR, (i * CELL_SIZE, 0), (i * CELL_SIZE, SCREEN_HEIGHT), 1)
+
+    def create_board(self):
+        for row in range(self.board_size):
+            for col in range(self.board_size):
+                color = LIGHT_COLOR if (row + col) % 2 == 0 else DARK_COLOR
+                square = row * BOARD_SIZE + col
+                button = Button(col * CELL_SIZE, row * CELL_SIZE, CELL_SIZE, CELL_SIZE, color=color, id=square)
+                self.squares.append(button)
+        self.draw_board_lines()
+
+    def update_board(self):
+        for square in self.squares:
+            # Resetuj kolor pola do domyślnego
+            default_color = LIGHT_COLOR if (square.id // self.board_size + square.id % self.board_size) % 2 == 0 else DARK_COLOR
+            square.set_color(default_color)
+
+            # Podświetlenie pola króla w szachu
+            if square == self.king_square:
+                color = (255, 102, 102)  # Lekki czerwony
+                square.set_color(color)
+
+            # Podświetlenie legalnych pól, jeśli są ustawione
+            if self.legal_moves and square in self.legal_moves:
+                color = (173, 216, 230)  # Lekki błękit
+                square.set_color(color)
+
+            # Rysowanie pola (bez tekstu)
+            if not square.text:
+                square.draw(self.screen)
+
+        # Rysowanie linii siatki
+        self.draw_board_lines()
+
+    def get_king_square_in_check(self):
+        """
+        Zwraca pole króla, jeśli jest w szachu, w przeciwnym razie None.
+        """
+        king_square = board.king_squares[board.turn]  # Znajdź pole króla aktualnego gracza
+        if board.is_attacked_by(board.turn ^ 1, king_square):  # Sprawdź, czy król jest atakowany
+            for square in self.squares:
+                if square.id == king_square:
+                    king_square = square
+            return king_square
+        return None
+
+    def draw_pieces(self):
+        """
+        Rysuje figury na planszy i resetuje pola bez figur.
+        """
+        for square in self.squares:
+            # Reset tekstu na polach
+            square.set_text(None)
+
+            # Pobierz figurę z planszy na odpowiednim polu
+            piece = board.piece_at(square.id)
+            if piece:
+                # Ustaw kolor tekstu w zależności od koloru figury
+                text_color = BLACK if piece.color == shogi.BLACK else WHITE
+                symbol = piece.symbol()  # Symbol figury
+                square.set_text(symbol)
+
+                # Rysowanie pola z odpowiednim kolorem tekstu
+                square.draw(self.screen, font_size=CELL_SIZE // 2, text_color=text_color)
+            else:
+                # Rysowanie pustego pola
+                square.draw(self.screen, BLACK)
+
+    def get_legal_moves(self, square):
+        """
+        Zwraca listę pól, na które wybrana figura może się ruszyć.
+        """
+        square = square.id
+        moves = list(board.legal_moves)  # Wszystkie możliwe ruchy
+        legal_squares_ids = [
+            move.to_square for move in moves if move.from_square == square
+        ]
+
+        legal_squares = [square for square in self.squares if square.id in legal_squares_ids]
+        self.legal_moves = legal_squares
+        return legal_squares
+
+    def clicked(self, pos):
+        x, y = pos
+        return y < 9 * CELL_SIZE and x < 9 * CELL_SIZE
+
+    def clicked_square(self, pos):
+        for square in self.squares:
+            if square.clicked(pos):
+                return square
+
+    def find_piece(self, square):
+        """Znajduje figurę o na odpowiednim polu"""
+        if square.text:
+            piece = board.piece_at(square.id)
+            self.selected_piece = piece
+        else:
+            self.selected_piece = None
+
+    def make_move(self, from_square, to_square):
+        move = shogi.Move(from_square.id, to_square.id, self.promotion)
+        if move in board.legal_moves:
+            board.push(move)
+
+    def set_promotion(self, value):
+        self.promotion = value
+
+    def is_in_promotion_zone(self, square, color):
+        """
+        Sprawdza, czy pole znajduje się w strefie promocji.
+        """
+        square = square.id
+        if color == shogi.BLACK:
+            return square // BOARD_SIZE in [0, 1, 2]  # Trzy ostatnie rzędy dla czarnych
+        elif color == shogi.WHITE:
+            return square // BOARD_SIZE in [6, 7, 8]  # Trzy ostatnie rzędy dla białych
+        return False
+
+    def ask_for_promotion_gui(self):
+        """
+        Wyświetla okno dialogowe z pytaniem o promocję.
+        """
+        font = pygame.font.SysFont("Arial", 24)
+        question = font.render("Promote piece? (Y/N)", True, (25, 255, 255))
+        self.screen.blit(question, (SCREEN_WIDTH // 2 - question.get_width() // 2, SCREEN_HEIGHT // 2 - question.get_height() // 2))
+        pygame.display.flip()
+
+        while True:
+            for event in pygame.event.get():
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_y:
+                        return True
+                    elif event.key == pygame.K_n:
+                        return False
 
 
 # Rysowanie planszy
@@ -126,7 +282,6 @@ def draw_undo_redo_buttons():
         (x + 3 * width // 4, y + height - 10),
     ]
     pygame.draw.polygon(screen, BLACK, right_triangle)
-
 
 
 def find_piece(square):
@@ -516,124 +671,190 @@ def place_piece_on_board(color, piece_type, target_square):
 
 
 
-undone_moves = []
-running = True
-selected_piece = None
-selected_square = None
-highlighted_squares = []
-king_in_check_square = None
-game_over = False
-start_time = None
-end_time = None
-add_mode = False
-add_piece_data = None
+# undone_moves = []
+# running = True
+# selected_piece = None
+# selected_square = None
+# highlighted_squares = []
+# king_in_check_square = None
+# game_over = False
+# start_time = None
+# end_time = None
+# add_mode = False
+# add_piece_data = None
 
 
-if __name__ == "__main__":
+# if __name__ == "__main__":
+#     pygame.init()
+
+#     # Pętla gry
+#     while running:
+#         for event in pygame.event.get():
+#             if event.type == pygame.QUIT:
+#                 running = False
+#             elif not game_over and event.type == pygame.MOUSEBUTTONDOWN:
+#                 x, y = pygame.mouse.get_pos()
+
+#                 if not add_mode:
+#                     if y < 9 * CELL_SIZE and x < 9 * CELL_SIZE:
+#                         square = (y // CELL_SIZE) * BOARD_SIZE + (x // CELL_SIZE)
+#                     else:
+#                         square = 1
+#                 else:
+#                     if y < 9 * CELL_SIZE and x < 9 * CELL_SIZE:
+#                         square = (y // CELL_SIZE) * BOARD_SIZE + (x // CELL_SIZE)
+#                         piece_type, color = add_piece_data
+#                         place_piece_on_board(color, piece_type, target_square=square)
+#                         add_mode = False
+
+#                 # Obsługa przycisku "Cofnij"
+#                 if RECT_POS[0] <= x <= RECT_POS[0] + RECT_SIZE[0] // 2 and RECT_POS[1] <= y <= RECT_POS[1] + RECT_SIZE[1]:
+#                     selected_piece, selected_square = undo_last_move(undone_moves, selected_piece, selected_square)
+
+#                 # Obsługa przycisku "Do przodu"
+#                 elif RECT_POS[0] + RECT_SIZE[0] // 2 <= x <= RECT_POS[0] + RECT_SIZE[0] and RECT_POS[1] <= y <= RECT_POS[1] + RECT_SIZE[1]:
+#                     selected_piece, selected_square = redo_last_move(undone_moves, selected_piece, selected_square)
+
+#                 # Obsługa kliknięcia na margines
+#                 if y > CELL_SIZE and x > 9 * CELL_SIZE:
+#                     margin_square = get_clicked_margin_square(x, y)
+#                     if is_margin_square_occupied(margin_square):
+#                         add_mode = True
+#                         symbol, count, piece_type, color = is_margin_square_occupied(margin_square)
+#                         add_piece_data = piece_type, color
+#                     else:
+#                         show_message("U have no piece to drop", 34, PURPLE)
+
+
+
+
+#                 # Obsługa kliknięcia na planszy
+#                 if not add_mode:
+#                     if selected_piece is None:
+#                         piece = find_piece(square)
+#                         if piece is not None:
+#                             selected_piece = piece
+#                             selected_square = square
+#                             highlighted_squares = get_legal_moves(square)
+#                     else:
+#                         if square in highlighted_squares:
+#                             promotion = False
+#                             if is_in_promotion_zone(square, selected_piece.color) and not selected_piece.is_promoted() and selected_piece.piece_type != shogi.KING:
+#                                 promotion = ask_for_promotion_gui()
+
+#                             move = shogi.Move(from_square=selected_square, to_square=square, promotion=promotion)
+#                             board.push(move)
+#                             undone_moves.clear()
+
+#                             # Rozpoczęcie liczenia czasu przy pierwszym ruchu
+#                             if start_time is None:
+#                                 start_time = time.time()
+
+#                         selected_piece = None
+#                         selected_square = None
+#                         highlighted_squares = []
+
+#                 king_in_check_square = get_king_square_in_check()
+
+#                 if board.is_game_over():
+#                     game_over = True
+#                     end_time = time.time()  # Zapisz czas zakończenia gry
+#                     end_time -= start_time
+#                     save_game(date=str(datetime.datetime.now())[:19], filename=f'Top10/game.json', timex=int(end_time))
+#                     rename_and_clean_top_games('Top10')
+#                     if board.is_stalemate():
+#                         show_message('Stalemate')
+#                     show_message()
+#                     running = False
+
+#         # Obliczanie czasu gry
+#         if start_time is not None:
+#             if end_time is None:
+#                 elapsed_time = time.time() - start_time  # Gra w toku
+#             else:
+#                 elapsed_time = end_time
+#         else:
+#             elapsed_time = 0  # Wyświetla 00:00 przed pierwszym ruchem
+
+#         minutes, seconds = divmod(int(elapsed_time), 60)
+#         pygame.display.set_caption(f'SHOGI-GAME {minutes:02}:{seconds:02}')
+
+#         # Rysowanie
+#         if not game_over:
+#             screen.fill((149, 165, 166))
+#             draw_margines()
+#             draw_captured_pieces(WHITE)
+#             draw_captured_pieces(BLACK)
+#             draw_undo_redo_buttons()
+#             draw_board()
+#             draw_pieces(board)
+#             pygame.display.flip()
+
+#     pygame.quit()
+#     sys.exit()
+
+def main():
     pygame.init()
+    window = GameWindow()
+    window.create_board()
 
-    # Pętla gry
+    running = True
     while running:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
-            elif not game_over and event.type == pygame.MOUSEBUTTONDOWN:
-                x, y = pygame.mouse.get_pos()
+            elif event.type == pygame.MOUSEBUTTONDOWN:
 
-                if not add_mode:
-                    if y < 9 * CELL_SIZE and x < 9 * CELL_SIZE:
-                        square = (y // CELL_SIZE) * BOARD_SIZE + (x // CELL_SIZE)
+
+                if not window.add_mode:
+                    square = window.clicked_square(event.pos)
+
+                    if window.selected_piece is None:
+                        # Spróbuj znaleźć figurę na klikniętym polu
+                        if square:
+                            window.find_piece(square)
+                            if window.selected_piece:
+                                # Zaznacz figurę i podświetl legalne ruchy
+                                window.selected_square = square
+                                window.get_legal_moves(square)
+                            else:
+                                # Reset podświetlenia, jeśli kliknięto puste pole
+                                window.selected_square = None
+                                window.legal_moves = False
                     else:
-                        square = 1
-                else:
-                    if y < 9 * CELL_SIZE and x < 9 * CELL_SIZE:
-                        square = (y // CELL_SIZE) * BOARD_SIZE + (x // CELL_SIZE)
-                        piece_type, color = add_piece_data
-                        place_piece_on_board(color, piece_type, target_square=square)
-                        add_mode = False
+                        # Kliknięcie na jedno z podświetlonych pól
+                        if square in window.legal_moves:
+                            # Sprawdź, czy wymagana jest promocja
+                            window.promotion = False
+                            if window.is_in_promotion_zone(square, window.selected_piece.color) and not window.selected_piece.is_promoted() and window.selected_piece.piece_type != shogi.KING:
+                                window.promotion = window.ask_for_promotion_gui()
 
-                # Obsługa przycisku "Cofnij"
-                if RECT_POS[0] <= x <= RECT_POS[0] + RECT_SIZE[0] // 2 and RECT_POS[1] <= y <= RECT_POS[1] + RECT_SIZE[1]:
-                    selected_piece, selected_square = undo_last_move(undone_moves, selected_piece, selected_square)
+                            # Wykonaj ruch
+                            window.make_move(window.selected_square, square)
+                            # Sprawdź czy król jest atakowany
+                            window.king_square = window.get_king_square_in_check()
 
-                # Obsługa przycisku "Do przodu"
-                elif RECT_POS[0] + RECT_SIZE[0] // 2 <= x <= RECT_POS[0] + RECT_SIZE[0] and RECT_POS[1] <= y <= RECT_POS[1] + RECT_SIZE[1]:
-                    selected_piece, selected_square = redo_last_move(undone_moves, selected_piece, selected_square)
+                            window.undone_moves.clear()
 
-                # Obsługa kliknięcia na margines
-                if y > CELL_SIZE and x > 9 * CELL_SIZE:
-                    margin_square = get_clicked_margin_square(x, y)
-                    if is_margin_square_occupied(margin_square):
-                        add_mode = True
-                        symbol, count, piece_type, color = is_margin_square_occupied(margin_square)
-                        add_piece_data = piece_type, color
-                    else:
-                        show_message("U have no piece to drop", 34, PURPLE)
+                            # Wyłącz podświetlenie po ruchu
+                            window.selected_piece = None
+                            window.selected_square = None
+                            window.legal_moves = False
+                        else:
+                            # Reset, jeśli kliknięto pole spoza legalnych ruchów
+                            window.selected_piece = None
+                            window.selected_square = None
+                            window.legal_moves = False
 
 
 
 
-                # Obsługa kliknięcia na planszy
-                if not add_mode:
-                    if selected_piece is None:
-                        piece = find_piece(square)
-                        if piece is not None:
-                            selected_piece = piece
-                            selected_square = square
-                            highlighted_squares = get_legal_moves(square)
-                    else:
-                        if square in highlighted_squares:
-                            promotion = False
-                            if is_in_promotion_zone(square, selected_piece.color) and not selected_piece.is_promoted() and selected_piece.piece_type != shogi.KING:
-                                promotion = ask_for_promotion_gui()
-
-                            move = shogi.Move(from_square=selected_square, to_square=square, promotion=promotion)
-                            board.push(move)
-                            undone_moves.clear()
-
-                            # Rozpoczęcie liczenia czasu przy pierwszym ruchu
-                            if start_time is None:
-                                start_time = time.time()
-
-                        selected_piece = None
-                        selected_square = None
-                        highlighted_squares = []
-
-                king_in_check_square = get_king_square_in_check()
-
-                if board.is_game_over():
-                    game_over = True
-                    end_time = time.time()  # Zapisz czas zakończenia gry
-                    end_time -= start_time
-                    save_game(date=str(datetime.datetime.now())[:19], filename=f'Top10/game.json', timex=int(end_time))
-                    rename_and_clean_top_games('Top10')
-                    if board.is_stalemate():
-                        show_message('Stalemate')
-                    show_message()
-                    running = False
-
-        # Obliczanie czasu gry
-        if start_time is not None:
-            if end_time is None:
-                elapsed_time = time.time() - start_time  # Gra w toku
-            else:
-                elapsed_time = end_time
-        else:
-            elapsed_time = 0  # Wyświetla 00:00 przed pierwszym ruchem
-
-        minutes, seconds = divmod(int(elapsed_time), 60)
-        pygame.display.set_caption(f'SHOGI-GAME {minutes:02}:{seconds:02}')
-
-        # Rysowanie
-        if not game_over:
-            screen.fill((149, 165, 166))
-            draw_margines()
-            draw_captured_pieces(WHITE)
-            draw_captured_pieces(BLACK)
-            draw_undo_redo_buttons()
-            draw_board()
-            draw_pieces(board)
-            pygame.display.flip()
+        window.draw_pieces()
+        window.update_board()
+        pygame.display.flip()
 
     pygame.quit()
-    sys.exit()
+
+if __name__ == "__main__":
+    main()
+
