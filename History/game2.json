@@ -1,0 +1,72 @@
+{
+    "date": "2025-01-11 03:04:50",
+    "time": 7,
+    "moves": [
+        {
+            "from": 60,
+            "to": 51,
+            "promo": false,
+            "dropped_type": null
+        },
+        {
+            "from": 24,
+            "to": 33,
+            "promo": false,
+            "dropped_type": null
+        },
+        {
+            "from": 61,
+            "to": 52,
+            "promo": false,
+            "dropped_type": null
+        },
+        {
+            "from": 4,
+            "to": 14,
+            "promo": false,
+            "dropped_type": null
+        },
+        {
+            "from": 62,
+            "to": 53,
+            "promo": false,
+            "dropped_type": null
+        },
+        {
+            "from": 14,
+            "to": 24,
+            "promo": false,
+            "dropped_type": null
+        },
+        {
+            "from": 51,
+            "to": 42,
+            "promo": false,
+            "dropped_type": null
+        },
+        {
+            "from": 24,
+            "to": 34,
+            "promo": false,
+            "dropped_type": null
+        },
+        {
+            "from": 52,
+            "to": 43,
+            "promo": false,
+            "dropped_type": null
+        },
+        {
+            "from": 34,
+            "to": 35,
+            "promo": false,
+            "dropped_type": null
+        },
+        {
+            "from": 53,
+            "to": 44,
+            "promo": false,
+            "dropped_type": null
+        }
+    ]
+}
