@@ -68,6 +68,9 @@ class GameWindow:
         self.margin_buttons = []
         self.selected_piece_color = None
         self.back_button = None
+        self.selected_captured_button = None
+
+        self.message = None
 
         self.add_mode = False
         self.game_over = False
@@ -220,7 +223,7 @@ class GameWindow:
 
     def draw_margines(self):
         """
-        Rysuje margines po prawej stronie planszy shogi z podziałem na rzędy.
+        Rysuje linie marginesu po prawej stronie planszy shogi z podziałem na rzędy.
         """
 
         font = pygame.font.SysFont("Arial", 14, bold=True)
@@ -249,7 +252,9 @@ class GameWindow:
 
 
         for button in self.margin_buttons:
-            # button.set_color(GREY)
+            # if self.selected_captured_button:
+            #     if self.add_mode:
+            #         self.selected_captured_button.set_color(GREY)
             button.draw(self.screen)
             pygame.draw.rect(self.screen, BLACK, button, width=2)
 
@@ -301,20 +306,17 @@ class GameWindow:
             self.margin_captured_buttons.append(margin_pole)
 
 
-    def show_message(self, message="GAME OVER", font_size=48, color=WHITE, time=5000):
+    def set_message(self, message=None, font_size=48, color=WHITE, timex=3000):
         """
         Wyświetla komunikat.
         """
-        font = pygame.font.SysFont("Arial", font_size, bold=True)
-        text = font.render(message, True, color)  # Biały tekst
-        text_rect = text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2))
+        self.message = message
+        if self.message:
+            font = pygame.font.SysFont("Arial", font_size, bold=True)
+            text_surface = font.render(message, True, color)  # Biały tekst
+            text_rect = text_surface.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2))
+        return text_surface, text_rect
 
-        # Rysowanie komunikatu na ekranie
-        self.screen.blit(text, text_rect)
-        pygame.display.flip()
-
-        # Poczekaj kilka sekund
-        pygame.time.wait(time)
 
     def undo_last_move(self):
         """
@@ -329,7 +331,7 @@ class GameWindow:
             move = self.board.pop()  # Cofnij ostatni ruch
             self.undone_moves.append(move)  # Zapisz cofnięty ruch
         else:
-            self.show_message("No moves to undo!", time=1000)
+            self.set_message("No moves to undo!", timex=1000)
 
         self.king_square = self.get_king_square_in_check()
         self.selected_piece = None
@@ -348,7 +350,7 @@ class GameWindow:
             move = self.undone_moves.pop()  # Pobierz ostatni cofnięty ruch
             self.board.push(move)  # Przywróć ruch na planszy
         else:
-            self.show_message('No moves to redo', time=1000)
+            self.set_message('No moves to redo', timex=1000)
 
         self.selected_piece = None
         self.selected_square = None
@@ -427,7 +429,7 @@ class GameWindow:
             self.board.push(move)
             return True
         else:
-            self.show_message("illegal move - try something else")
+            self.set_message("illegal move - try something else")
             return False
 
     def calculate_time(self):
@@ -451,15 +453,16 @@ class GameWindow:
         self.game_over = True
         if self.board.is_checkmate():
             if self.board.turn == shogi.WHITE:
-                self.show_message('BLACK WON!', color=BLACK, time=3000)
+                self.set_message('BLACK WON!', color=BLACK, timex=3000)
             else:
-                self.show_message('WHITE WON!', color=WHITE, time=3000)
+                self.set_message('WHITE WON!', color=WHITE, timex=3000)
         elif self.board.is_fourfold_repetition():
-            self.show_message('Stalemate!', color=BLACK, time=3000)
+            self.set_message('Stalemate!', color=BLACK, timex=3000)
         if self.board.is_stalemate():
-            self.show_message("Stalemate!", color=BLACK, time=3000)
+            self.set_message("Stalemate!", color=BLACK, time=3000)
         self.save_game()
         self.rename_files()
+        self.get_message()
 
     def choose_piece_drop(self, button):
         symbol = button.text[:-4]
@@ -483,6 +486,7 @@ class GameWindow:
         self.draw_pieces()
         self.update_board()
         self.calculate_time()
+        self.get_message()
 
 
     def save_game(self, directory='Top10/'):
@@ -617,6 +621,17 @@ class GameWindow:
             game.set_filename(new_filename.name)
             old_filename.rename(new_filename)
 
+    def get_message(self):
+        if self.message:
+            text_surface, text_rect = self.set_message(self.message)
+            # Rysowanie komunikatu na ekranie
+            self.screen.blit(text_surface, text_rect)
+        if self.board.is_game_over():
+            pygame.display.flip()
+            pygame.time.wait(3000)
+
+
+
 
 class LoadGameError(Exception):
     def __init__(self, error) -> None:
@@ -692,8 +707,10 @@ class Button(pygame.Rect):
         self.color = color if color else None
         self.id = id
         self.text_color = None
+        self._pressed = False
 
     def draw(self, surface, text_color=BLACK, font_type='Arial', font_size=24):
+        self.color = GREY if self.is_pressed() else self.color
         self.text_color = text_color
         if self.color:
             pygame.draw.rect(surface, self.color, self)
@@ -723,13 +740,20 @@ class Button(pygame.Rect):
     def clicked(self, pos):
         return self.collidepoint(pos)
 
+    def is_pressed(self):
+        return self._pressed
+
+    def set_press(self, value):
+        self._pressed = value
+
     def __eq__(self, other) -> bool:
         if isinstance(other, Button):
             return self.id == other.id
         return False
 
     def __str__(self):
-        return f"{self.id}"
+        return f"{self.id} {self.text}"
+
 
 
 class MainWindow:
@@ -823,6 +847,9 @@ def game_loop(
         window: GameWindow,
         event
             ) -> tuple:
+
+    window.message = None
+
     if window.back_button.clicked(event.pos):
         return 'main', False
 
@@ -875,6 +902,13 @@ def game_loop(
             if window.selected_square in window.squares:
                 window.place_piece_on_board()
                 window.king_square = window.get_king_square_in_check()
+
+                window.add_mode = False
+                window.selected_piece = None
+                window.selected_square = None
+                window.selected_piece_color = None
+            else:
+
                 window.add_mode = False
                 window.selected_piece = None
                 window.selected_square = None
@@ -884,8 +918,10 @@ def game_loop(
             if button.clicked(event.pos):
                 if button.text:
                     window.choose_piece_drop(button)
+                    window.selected_captured_button = button
                 else:
-                    window.show_message('No piece to drop', font_size=24)
+                    window.set_message('No piece to drop', font_size=24)
+
 
         # Obsługa przycisków undo, redo
         if window.margin_buttons[0].clicked(event.pos):
