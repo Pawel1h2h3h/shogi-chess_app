@@ -469,7 +469,7 @@ class GameWindow:
         self.add_mode = True
 
 
-    def bg_image(self, path="gamewindow_image.jpg"):
+    def bg_image(self, path="pictures/gamewindow_image.jpg"):
         bg_image = pygame.image.load(path)
         bg_image = pygame.transform.scale(bg_image, (SCREEN_WIDTH, SCREEN_HEIGHT))
         self.screen.blit(bg_image, (9*CELL_SIZE, 0))
@@ -706,6 +706,14 @@ class Button(pygame.Rect):
             text_rect = text_surface.get_rect(center=self.center)
             surface.blit(text_surface, text_rect)
 
+    def draw_date(self, surface, date, text_color=BLACK, font_size=24):
+        text_pos = self.bottomright
+        font = pygame.font.SysFont("Arial", font_size, bold=True)
+        text_surface = font.render(date, True, text_color)
+        text_rect = text_surface.get_rect(center=text_pos)
+        surface.blit(text_surface, text_rect)
+
+
     def set_color(self, new_color):
         self.color = new_color
 
@@ -745,7 +753,7 @@ class MainWindow:
         y = self.screen_size[1]//30
         return Button(x, y, 200, 50, 'Top 10', GRAY)
 
-    def bg_image(self, path="background.jpg"):
+    def bg_image(self, path="pictures/background.jpg"):
         bg_image = pygame.image.load(path)
         bg_image = pygame.transform.scale(bg_image, self.screen_size)
         self.screen.blit(bg_image, (0, 0))
