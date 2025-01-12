@@ -167,38 +167,3 @@ Aplikacja przechowuje zapisy partii w formacie **JSON** w katalogu `Top10`. Każ
   ]
 }
 
-
-### Część refleksyjna
-
-W ramach projektu zrealizowano wiele istotnych funkcji, umożliwiających grę oraz analizę partii Shogi. Stworzono intuicyjny interfejs użytkownika, obsługę ruchów, promocji figur, cofania i ponawiania ruchów oraz system zapisu i odczytu partii w formacie JSON. W pełni zintegrowano aplikację z biblioteką `shogi`, co zapewniło precyzyjne odwzorowanie zasad gry.
-
-#### Osiągnięcia:
-1. Zrealizowano kluczowe funkcje:
-   - Główne okno aplikacji z wyborem nowej gry oraz analizą zapisanych partii.
-   - Obsługa logiki Shogi z wykorzystaniem biblioteki `shogi`.
-   - Implementacja interfejsu graficznego z biblioteką `pygame`.
-   - Obsługa zapisu i odczytu partii w formacie JSON, z dynamicznie generowaną listą zapisanych gier.
-2. Aplikacja działa płynnie w środowiskach Windows, macOS i Linux.
-3. Zapewniono łatwą konfigurację poprzez plik `setup.py` i obsługę wirtualnego środowiska.
-
-#### Rzeczy, których nie udało się osiągnąć:
-1. **Renderowanie bierek w postaci japońskich znaków:**
-   - Gra w Shogi tradycyjnie korzysta z japońskich znaków do oznaczenia figur. Niestety, implementacja tego rozwiązania nie została ukończona.
-   - **Powód:** Brak odpowiednich fontów lub obrazów dla bierek. Próba wykorzystania czcionek z japońskimi znakami w `pygame` napotkała problemy z kompatybilnością i czytelnością znaków na planszy.
-   - **Skutki:** Bez tego rozwiązania gra może być łatwiejsza dla osób nieznających japońskich znaków.
-
-2. **Pełna personalizacja wyglądu aplikacji:**
-   - Choć zaimplementowano obsługę tła i ikon, brak jest zaawansowanej opcji dostosowywania interfejsu (np. zmiany motywu kolorystycznego przez użytkownika).
-   - **Powód:** Ograniczenia czasowe.
-
-#### Napotkane przeszkody:
-1. **Problemy z bibliotekami:**
-   - `pygame` okazało się nieco ograniczone w obsłudze zaawansowanego renderowania tekstu, co utrudniło wprowadzenie japońskich znaków.
-
-#### Co się zmieniło w stosunku do planowanego rozwiązania:
-1. Zrezygnowano z użycia japońskich znaków na rzecz bardziej uniwersalnych symboli figur, aby zapewnić minimalną funkcjonalność gry.
-2. Wprowadzono bardziej szczegółowy system analizy partii (np. cofanie i odtwarzanie ruchów), co pierwotnie nie było planowane.
-3. Aplikacja została zoptymalizowana do obsługi na wielu platformach, choć początkowo skupiano się głównie na jednym systemie operacyjnym.
-
-#### Wnioski:
-Projekt udało się zrealizować w dużej mierze zgodnie z założeniami, choć niektóre funkcje wymagały uproszczenia. Kluczowe wyzwania, takie jak obsługa czcionek z japońskimi znakami, wymagałyby więcej czasu na dokładniejsze zbadanie dostępnych rozwiązań. Mimo to aplikacja w obecnej formie stanowi solidną podstawę do dalszego rozwoju np.: tryb online multiplayer.
