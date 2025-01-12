@@ -148,8 +148,20 @@ class GameWindow:
                 symbol = piece.symbol()  # Symbol figury
                 square.set_text(symbol)
 
+                # Wybór obwódki w zaleności od ruchu gracza
+                if self.board.turn == shogi.WHITE:
+                    if text_color == WHITE:
+                        with_outline = True
+                    else:
+                        with_outline = False
+                else:
+                    if text_color == BLACK:
+                        with_outline = True
+                    else:
+                        with_outline = False
+
                 # Rysowanie pola z odpowiednim kolorem tekstu
-                square.draw(self.screen, font_size=CELL_SIZE // 2, text_color=text_color)
+                square.draw(self.screen, font_size=CELL_SIZE // 2, text_color=text_color, with_outline=with_outline)
             else:
                 # Rysowanie pustego pola
                 square.draw(self.screen, BLACK)
@@ -704,18 +716,53 @@ class Button(pygame.Rect):
         self.text_color = None
         self._pressed = False
 
-    def draw(self, surface, text_color=BLACK, font_type='Arial', font_size=24):
+    def draw(self, surface, text_color=BLACK, font_type='Arial', font_size=24, with_outline=False):
+        """
+        Rysuje przycisk z tekstem i ewentualną obwódką tekstu.
+
+        Args:
+            surface (pygame.Surface): Powierzchnia, na której rysowany jest przycisk.
+            text_color (tuple): Kolor tekstu (R, G, B).
+            font_type (str): Nazwa czcionki.
+            font_size (int): Rozmiar czcionki.
+        """
         self.text_color = text_color
+
+        # Rysowanie przycisku
         if self.color:
             pygame.draw.rect(surface, self.color, self)
         else:
             pygame.draw.rect(surface, BLACK, self, width=2)
 
+        # Rysowanie tekstu
         if self.text:
             font = pygame.font.SysFont(font_type, font_size, bold=True)
-            text_surface = font.render(self.text, True, text_color)
-            text_rect = text_surface.get_rect(center=self.center)
-            surface.blit(text_surface, text_rect)
+
+            if with_outline:
+                outline_color = GRAY # Kolor obwódki (czarny)
+                outline_width = 1
+
+                # Renderowanie tekstu z obwódką
+                outline_surface = font.render(self.text, True, outline_color)
+                text_surface = font.render(self.text, True, text_color)
+
+                # Pozycjonowanie tekstu
+                text_rect = text_surface.get_rect(center=self.center)
+                outline_rect = outline_surface.get_rect(center=self.center)
+
+                # Rysowanie obwódki wokół tekstu
+                for dx in range(-outline_width, outline_width + 1):
+                    for dy in range(-outline_width, outline_width + 1):
+                        if dx != 0 or dy != 0:  # Nie rysuj środka wielokrotnie
+                            surface.blit(outline_surface, outline_rect.move(dx, dy))
+
+                # Rysowanie głównego tekstu
+                surface.blit(text_surface, text_rect)
+            else:
+                # Renderowanie tekstu bez obwódki
+                text_surface = font.render(self.text, True, text_color)
+                text_rect = text_surface.get_rect(center=self.center)
+                surface.blit(text_surface, text_rect)
 
     def draw_date(self, surface, date, text_color=BLACK, font_size=24):
         text_pos = self.bottomright
