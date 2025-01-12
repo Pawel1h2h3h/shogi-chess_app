@@ -12,9 +12,16 @@ class SaveGameError(Exception):
     def __init__(self, error) -> None:
         super().__init__(f"Cannot save game: {error}")
 
+
 class ModerateGameNamesError(Exception):
     def __init__(self, error) -> None:
         super().__init__(f"Cannot moderate Top10 fieles: {error}")
+
+
+class LoadGameError(Exception):
+    def __init__(self, error) -> None:
+        super().__init__(f'Cannot load the game{error}')
+
 
 # Ustawienia planszy
 CELL_SIZE = 80
@@ -34,6 +41,7 @@ WHITE = (255, 255, 255)
 PURPLE = (73, 50, 103)
 BEIGE = (255, 240, 219)
 GRAY = (149, 165, 166)
+BLUE = (137, 204, 240)
 
 # Ustawienie marginesu
 RECT_POS = CELL_SIZE*9 + 20, 10
@@ -51,6 +59,48 @@ ROW_SIZE = 8 * CELL_SIZE / 14  # Wysokość każdego wiersza marginesu
 
 
 class GameWindow:
+    """
+    Klasa reprezentująca główne okno gry w Shogi.
+
+    Klasa obsługuje logikę gry, interfejs użytkownika oraz interakcję z planszą gry.
+    Zarządza stanem gry, w tym ruchem figur, promowaniem, cofaniem i ponawianiem ruchów,
+    a także wyświetlaniem informacji o zbitych figurach i czasie gry.
+
+    Atrybuty:
+        squares (list): Lista pól planszy reprezentowanych jako obiekty klasy Button.
+        board_size (int): Rozmiar planszy (domyślnie 9x9).
+        screen (pygame.Surface): Powierzchnia renderowania Pygame.
+        board (shogi.Board): Obiekt planszy Shogi z biblioteką shogi.
+        king_square (Button or None): Pole, na którym znajduje się król (jeśli jest w szachu).
+        selected_piece (shogi.Piece or None): Wybrana figura do wykonania ruchu.
+        legal_moves (list or bool): Lista pól, na które figura może się ruszyć.
+        selected_square (Button or None): Wybrane pole na planszy.
+        promotion (bool): Flaga wskazująca, czy figura ma być promowana.
+        undone_moves (list): Lista cofniętych ruchów.
+        captured_pieces (dict): Słownik przechowujący zbite figury.
+        margin_captured_buttons (list): Lista przycisków na marginesie reprezentujących zbite figury.
+        margin_buttons (list): Lista przycisków na marginesie do cofania i ponawiania ruchów.
+        selected_piece_color (int or None): Kolor wybranej figury (shogi.BLACK lub shogi.WHITE).
+        back_button (Button or None): Przycisk powrotu do menu głównego.
+        selected_captured_button (Button or None): Wybrany przycisk reprezentujący figurę na marginesie.
+        message (str or None): Aktualny komunikat wyświetlany użytkownikowi.
+        add_mode (bool): Tryb dodawania figur na planszę.
+        game_over (bool): Flaga wskazująca, czy gra została zakończona.
+        start_time (float or None): Czas rozpoczęcia gry.
+        end_time (float or None): Czas zakończenia gry.
+
+    Metody:
+        - Zarządzanie planszą (tworzenie, rysowanie, aktualizowanie).
+        - Obsługa ruchów (wykonywanie, cofanie, ponawianie).
+        - Wyświetlanie zbitych figur i marginesów.
+        - Obsługa promocji figur.
+        - Zarządzanie stanem gry (sprawdzanie szach-mata, remisu itp.).
+        - Zarządzanie zapisami gier (zapis, wczytywanie, sortowanie).
+
+    Uwagi:
+        Klasa współpracuje z biblioteką Pygame do renderowania interfejsu i biblioteką Shogi
+        do zarządzania logiką gry. Wymaga poprawnie zainicjalizowanego środowiska Pygame.
+    """
     def __init__(self, screen) -> None:
         self.squares = []
         self.board_size = 9
@@ -645,14 +695,30 @@ class GameWindow:
             pygame.time.wait(3000)
 
 
-
-
-class LoadGameError(Exception):
-    def __init__(self, error) -> None:
-        super().__init__(f'Cannot load the game{error}')
-
-
 class Game:
+    """
+    Klasa reprezentująca zapis gry w Shogi.
+
+    Klasa przechowuje informacje o zapisanej grze, w tym datę, czas trwania oraz listę ruchów.
+    Umożliwia zarządzanie nazwą pliku, w którym gra została zapisana.
+
+    Atrybuty:
+        moves (list): Lista ruchów wykonanych w grze. Każdy ruch jest obiektem `shogi.Move`.
+        date (str): Data rozpoczęcia gry w formacie tekstowym (np. "YYYY-MM-DD HH:MM:SS").
+        time (int): Czas trwania gry w sekundach.
+        filename (str or None): Nazwa pliku, w którym gra została zapisana.
+
+    Metody:
+        set_filename(new_filename):
+            Ustawia nazwę pliku, w którym gra została zapisana.
+        get_filename():
+            Zwraca nazwę pliku, w którym gra została zapisana.
+
+    Uwagi:
+        - Klasa jest pomocnicza i służy do przechowywania danych o grze.
+        - Ruchy są przechowywane jako lista obiektów `shogi.Move`.
+        - Przeznaczona do użycia w systemach zapisów i analiz gier Shogi.
+    """
     def __init__(self, date, time, moves=None) -> None:
         self.moves = moves if moves else []
         self.date = date
@@ -667,6 +733,30 @@ class Game:
 
 
 class AnaliseWindow(GameWindow):
+    """
+    Klasa reprezentująca okno analizy zapisanej gry w Shogi.
+
+    Klasa dziedziczy z `GameWindow` i rozszerza jej funkcjonalność o możliwość przeglądania
+    oraz analizy zapisanych gier. Umożliwia odtwarzanie ruchów, cofanie ich oraz zarządzanie stanem gry.
+
+    Atrybuty:
+        done_moves (list): Lista wykonanych ruchów, które można cofnąć.
+        backed_moves (list): Lista cofniętych ruchów.
+        board (shogi.Board): Obiekt planszy Shogi z biblioteką shogi.
+        game (Game or None): Obiekt reprezentujący zapisaną grę, w tym jej ruchy.
+
+    Metody:
+        make_move():
+            Wykonuje kolejny ruch z listy zapisanych ruchów w analizowanej grze.
+        back_move():
+            Cofa ostatni wykonany ruch, przywracając go do listy ruchów w grze.
+
+    Uwagi:
+        - Klasa wykorzystuje funkcjonalność biblioteki `shogi` do obsługi logiki gry.
+        - Ruchy są przechowywane w atrybucie `game.moves`, a ich stan jest dynamicznie modyfikowany
+          podczas wykonywania lub cofania ruchów.
+        - W celu użycia tej klasy należy załadować zapis gry do atrybutu `game`.
+    """
     def __init__(self, screen) -> None:
         super().__init__(screen)
         self.done_moves = []
@@ -708,6 +798,48 @@ class AnaliseWindow(GameWindow):
 
 
 class Button(pygame.Rect):
+    """
+    Klasa reprezentująca przycisk z obsługą tekstu, koloru i interakcji.
+
+    Dziedziczy z `pygame.Rect` i rozszerza jego funkcjonalność o możliwość rysowania na ekranie
+    oraz interakcję z użytkownikiem. Przyciski mogą być wykorzystywane do tworzenia elementów
+    interfejsu użytkownika, takich jak menu, marginesy czy pola planszy.
+
+    Atrybuty:
+        text (str or None): Tekst wyświetlany na przycisku.
+        color (tuple or None): Kolor wypełnienia przycisku (R, G, B). Jeśli `None`, przycisk
+            będzie pusty z czarną ramką.
+        id (int or None): Unikalny identyfikator przycisku.
+        text_color (tuple or None): Kolor tekstu wyświetlanego na przycisku.
+        _pressed (bool): Flaga wskazująca, czy przycisk jest wciśnięty.
+
+    Metody:
+        draw(surface, text_color, font_type, font_size, with_outline):
+            Rysuje przycisk z tekstem i opcjonalną obwódką tekstu na podanej powierzchni.
+        draw_date(surface, date, text_color, font_size):
+            Rysuje datę w rogu przycisku.
+        set_color(new_color):
+            Ustawia nowy kolor przycisku.
+        set_text(new_text):
+            Ustawia nowy tekst wyświetlany na przycisku.
+        clicked(pos):
+            Sprawdza, czy podana pozycja kliknięcia znajduje się na przycisku.
+        is_pressed():
+            Zwraca, czy przycisk jest wciśnięty.
+        set_press(value):
+            Ustawia stan wciśnięcia przycisku.
+        __eq__(other):
+            Porównuje dwa przyciski na podstawie ich identyfikatorów.
+        __str__():
+            Zwraca tekstową reprezentację przycisku w formacie "{id} {text}".
+
+    Uwagi:
+        - Metoda `draw` umożliwia rysowanie tekstu z obwódką (np. czerwony kontur) lub bez niej.
+        - Przyciski można łatwo używać do implementacji logiki interfejsu dzięki metodom
+          takim jak `clicked` czy `is_pressed`.
+        - Klasa jest kompatybilna z biblioteką Pygame i wymaga poprawnie zainicjalizowanego środowiska graficznego.
+    """
+
     def __init__(self, x, y, width, height, text=None, color=None, id=None):
         super().__init__(x, y, width, height)
         self.text = text if text else None
@@ -739,7 +871,7 @@ class Button(pygame.Rect):
             font = pygame.font.SysFont(font_type, font_size, bold=True)
 
             if with_outline:
-                outline_color = GRAY # Kolor obwódki (czarny)
+                outline_color = BLUE # Kolor obwódki (czarny)
                 outline_width = 1
 
                 # Renderowanie tekstu z obwódką
@@ -792,12 +924,53 @@ class Button(pygame.Rect):
             return self.id == other.id
         return False
 
-    def __str__(self):
+    def __repr__(self):
         return f"{self.id} {self.text}"
 
 
-
 class MainWindow:
+    """
+    Klasa reprezentująca główne okno aplikacji (menu startowe).
+
+    Klasa obsługuje wyświetlanie i zarządzanie głównymi elementami menu, takimi jak przycisk
+    startu gry, lista zapisanych gier ("Top 10") oraz interfejs graficzny tła.
+
+    Atrybuty:
+        screen (pygame.Surface): Powierzchnia renderowania Pygame.
+        screen_size (tuple): Rozmiar ekranu w pikselach.
+        start_button (Button): Przycisk startu gry.
+        top10_button (Button): Przycisk wyświetlający listę zapisanych gier.
+        top10_clicked (bool): Flaga wskazująca, czy lista zapisanych gier została kliknięta.
+        game_buttons (list): Lista przycisków reprezentujących zapisane gry.
+
+    Metody:
+        create_start():
+            Tworzy przycisk startu gry z wycentrowaną pozycją.
+        create_top10():
+            Tworzy przycisk "Top 10" w lewym górnym rogu.
+        bg_image(path="pictures/background.jpg"):
+            Wczytuje i wyświetla obraz tła na ekranie.
+        start_game():
+            Placeholder dla uruchamiania pliku `chess.py`.
+        change_top10_status():
+            Przełącza stan listy "Top 10" między widoczną a ukrytą.
+        update_game_buttons():
+            Aktualizuje listę przycisków zapisanych gier.
+        create_game_buttons(path='Top10'):
+            Tworzy przyciski dla zapisanych gier znajdujących się w katalogu `Top10`.
+        calculate_game_button_size():
+            Oblicza wymiary przycisków dla zapisanych gier.
+        open_saved_games(pos):
+            Otwiera zapisane gry po kliknięciu na odpowiedni przycisk.
+        draw_myself():
+            Rysuje elementy okna głównego, takie jak tło, przyciski oraz lista "Top 10", jeśli jest widoczna.
+
+    Uwagi:
+        - Klasa wymaga zainicjalizowanego środowiska Pygame.
+        - Zapisane gry muszą znajdować się w katalogu `Top10` w formacie JSON.
+        - Przyciski są rysowane dynamicznie w zależności od dostępnych plików zapisanych gier.
+    """
+
     def __init__(self, screen) -> None:
         self.screen = screen
         self.screen_size = self.screen.get_size()
@@ -975,5 +1148,4 @@ def game_loop(
         return 'main', False
     else:
         return 'game', window
-
 

@@ -28,5 +28,6 @@ def create_and_setup_venv():
         print(f"Błąd podczas instalacji zależności: {e}")
         sys.exit(1)
 
+
 if __name__ == "__main__":
     create_and_setup_venv()

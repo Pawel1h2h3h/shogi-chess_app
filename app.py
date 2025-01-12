@@ -8,6 +8,33 @@ ANALISE_EVENTS = [pygame.MOUSEBUTTONDOWN]
 
 
 class App:
+    """
+    Główna klasa aplikacji do gry w Shogi.
+
+    Zarządza oknami aplikacji (główne menu, okno gry, analiza zapisanych gier),
+    obsługuje wydarzenia i zapewnia płynną logikę przełączania między różnymi stanami aplikacji.
+
+    Attributes:
+        clock (pygame.time.Clock): Zegar kontrolujący odświeżanie ekranu.
+        screen (pygame.Surface): Powierzchnia głównego ekranu gry.
+        icon (pygame.Surface): Ikona aplikacji wyświetlana w pasku tytułu.
+        main_window (MainWindow): Instancja klasy obsługującej główne menu.
+        game (GameWindow or None): Instancja klasy obsługującej okno gry. Tworzona przy rozpoczęciu gry.
+        analise (AnaliseWindow or None): Instancja klasy obsługującej okno analizy zapisanych gier.
+        current_window (str): Aktualnie aktywne okno aplikacji. Możliwe wartości: "main", "game", "analise".
+
+    Methods:
+        operate_main_window(event):
+            Obsługuje wydarzenia w głównym oknie aplikacji.
+        operate_game_window(event):
+            Obsługuje wydarzenia w oknie gry.
+        operate_analize_window(event):
+            Obsługuje wydarzenia w oknie analizy zapisanych gier.
+        run():
+            Uruchamia główną pętlę aplikacji.
+        update():
+            Aktualizuje ekran w zależności od aktualnie aktywnego okna.
+    """
     def __init__(self, current_window='main', icon_path='pictures/icon.jpg') -> None:
         self.clock = pygame.time.Clock()
         self.screen = pygame.display.set_mode((12 * 80, 9 * 80))
