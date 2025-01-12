@@ -868,7 +868,7 @@ def game_loop(
                 if square in window.legal_moves:
                     # Sprawdź, czy wymagana jest promocja
                     window.promotion = False
-                    if window.is_in_promotion_zone(square, window.selected_piece.color) and not window.selected_piece.is_promoted() and window.selected_piece.piece_type != shogi.KING:
+                    if window.is_in_promotion_zone(square, window.selected_piece.color) and not window.selected_piece.is_promoted() and window.selected_piece.piece_type not in [shogi.KING, shogi.GOLD]:
                         window.promotion = window.ask_for_promotion_gui()
 
                     # Wykonaj ruch
