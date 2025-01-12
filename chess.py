@@ -252,9 +252,11 @@ class GameWindow:
 
 
         for button in self.margin_buttons:
-            # if self.selected_captured_button:
-            #     if self.add_mode:
-            #         self.selected_captured_button.set_color(GREY)
+            if self.selected_captured_button:
+                if self.add_mode:
+                    self.selected_captured_button.set_color(GREY)
+                else:
+                    self.selected_captured_button.set_color(None)
             button.draw(self.screen)
             pygame.draw.rect(self.screen, BLACK, button, width=2)
 
@@ -645,9 +647,6 @@ class Game:
         self.time = time
         self.filename = None
 
-    def add_move(self, move):
-        self.moves.append(move)
-
     def set_filename(self, new_filename):
         self.filename = new_filename
 
@@ -663,29 +662,25 @@ class AnaliseWindow(GameWindow):
         self.board = shogi.Board()
         self.game = None
 
-
-
-
-
     def make_move(self):
         """
-        Wykonuje kolejny ruch z listy ALL_MOVES i dodaje go do DONE_MOVES.
+        Wykonuje kolejny ruch z listy.
         """
         if self.game.moves:
-            move = self.game.moves.pop(0)  # Pobiera pierwszy ruch z ALL_MOVES
+            move = self.game.moves.pop(0)  # Pobiera pierwszy ruch
             self.board.push(move)  # Wykonuje ruch na planszy
-            self.done_moves.append(move)  # Dodaje ruch do listy DONE_MOVES
+            self.done_moves.append(move)  # Dodaje ruch do listy
         else:
             pass
 
     def back_move(self):
         """
-        Cofnięcie ostatniego ruchu z DONE_MOVES i dodanie go do ALL_MOVES.
+        Cofnięcie ostatniego ruchu.
         """
         if self.done_moves:
-            move = self.done_moves.pop()  # Pobiera ostatni ruch z DONE_MOVES
+            move = self.done_moves.pop()  # Pobiera ostatni ruch
             self.board.pop()  # Cofnięcie ruchu na planszy
-            self.game.moves.insert(0, move)  # Dodaje cofnięty ruch na początek ALL_MOVES
+            self.game.moves.insert(0, move)  # Dodaje cofnięty ruch na początek
         else:
             pass
 
@@ -710,7 +705,6 @@ class Button(pygame.Rect):
         self._pressed = False
 
     def draw(self, surface, text_color=BLACK, font_type='Arial', font_size=24):
-        self.color = GREY if self.is_pressed() else self.color
         self.text_color = text_color
         if self.color:
             pygame.draw.rect(surface, self.color, self)

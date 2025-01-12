@@ -36,8 +36,9 @@ class App:
                     self.analise = self.main_window.open_saved_games(event.pos)
                     if self.analise:
                         self.current_window = 'analise'
-                        date = self.analise.game.date
-                        pygame.display.set_caption(f'Game {date}')
+                        time = self.analise.game.time
+                        minutes, seconds = divmod(int(time), 60)
+                        pygame.display.set_caption(f'Game {minutes:02}:{seconds:02}')
 
     def operate_game_window(self, event):
         if self.current_window == "game":
